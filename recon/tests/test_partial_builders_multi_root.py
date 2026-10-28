@@ -129,6 +129,17 @@ class _Session:
                              # endpoint with no Parameter; the builder must skip it
                              "params": [{"name": "data", "sample_values": ["rO0ABXNy"]},
                                         {"name": None, "sample_values": []}]})
+        elif "openapi_security AS openapi_security" in cypher:
+            for url, host in BASEURLS:
+                rows.append({"base": url, "host": host, "path": "/api/v2/orders/1", "method": "GET",
+                             "category": "api", "sources": ["openapi"], "openapi_security": ["bearer"],
+                             "openapi_tags": ["internal"], "declared_only": True,
+                             "discovery_status": 401})
+                rows.append({"base": url, "host": host, "path": "/api/v2/orders/1", "method": "HEAD",
+                             "category": "api", "sources": ["openapi"], "openapi_security": None,
+                             "openapi_tags": None, "declared_only": True, "discovery_status": 200})
+        elif "USES_TECHNOLOGY" in cypher:
+            rows.append({"url": "https://www.alpha.test", "technologies": ["Spring Boot", "Java:17"]})
         elif "form_input_names" in cypher:
             for url, host in BASEURLS:
                 rows.append({"base": url, "host": host, "path": "/forms/aspnet",
@@ -401,6 +412,48 @@ class TestSerializedBuilder:
         assert ("native_java", "param", "https://www.alpha.test/api/load") in found
         assert not any("old.test" in url or url.startswith("https://beta.test/")
                        for _, _, url in found)
+
+
+class TestRouteExposureBuilder:
+    """_build_route_exposure_data_from_graph: the partial route exposure scan."""
+
+    def build(self, groups=GROUPS, settings=None):
+        return gb._build_route_exposure_data_from_graph(ROOTS, "u1", "p1", settings=settings or {},
+                                                        domain_groups=groups)
+
+    def test_a_stale_host_and_an_excluded_apex_are_dropped(self, graph):
+        data = self.build()
+        for section in (data["http_probe"]["by_url"], data["resource_enum"]["by_base_url"]):
+            assert not any("old.test" in u for u in section)
+            assert "https://beta.test" not in section
+        assert "https://alpha.test" in data["http_probe"]["by_url"]
+
+    def test_routes_keep_methods_openapi_and_the_denied_hint(self, graph):
+        eps = self.build()["resource_enum"]["by_base_url"]["https://www.alpha.test"]["endpoints"]
+        assert eps["/api/v2/orders/1"] == {
+            "methods": ["GET", "HEAD"], "category": "api", "sources": ["openapi"],
+            "declared_only": True,
+            "openapi": {"GET": {"security": ["bearer"], "tags": ["internal"]}},
+            "status_code": 401,
+        }
+
+    def test_technologies_and_ip_mode_targets(self, graph):
+        data = self.build(settings={"IP_MODE": True, "TARGET_IPS": ["10.0.0.1"]})
+        assert data["http_probe"]["by_url"]["https://www.alpha.test"]["technologies"] == ["Spring Boot", "Java:17"]
+        assert data["metadata"]["expanded_ips"] == ["10.0.0.1"]
+        assert data["subdomains"] == []
+
+    def test_the_rebuilt_corpus_is_what_the_scanner_reads(self, graph):
+        from recon.route_exposure import harvest, ranking
+        corpus = harvest.harvest(self.build())
+        route = corpus.routes[("https://www.alpha.test", "/api/v2/orders/1", "GET")]
+        ranking.score(route)
+        assert {"openapi", "openapi_tag", "declared_only", "seen_denied"} <= set(route.hints)
+        assert corpus.technologies["https://www.alpha.test"] == {"Spring Boot", "Java:17"}
+
+    def test_no_roots_reads_nothing(self, graph):
+        data = gb._build_route_exposure_data_from_graph([], "u1", "p1", settings={})
+        assert data["http_probe"]["by_url"] == {} and graph == []
 
 
 class TestGraphUrlScope:
