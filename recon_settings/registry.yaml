@@ -431,6 +431,16 @@ tools:
     traffic: none
     enabled_key: "ROE_ENABLED"
     form_section: "RoeSection"
+  route_exposure:
+    title: "Route exposure scan"
+    phase: vuln_scan
+    traffic: active
+    enabled_key: "ROUTE_EXPOSURE_ENABLED"
+    module: "recon.route_exposure"
+    isolated_fn: "run_route_exposure_isolated"
+    graph_writer: "update_graph_from_route_exposure"
+    partial_recon_module: "route_exposure_scanning"
+    form_section: "RouteExposureSection"
   security_check:
     title: "Security checks"
     phase: http_probe
@@ -7783,6 +7793,201 @@ fields:
     meaning: >-
       The IANA timezone the scanning window's times are read in.
     form_section: "TargetSection"
+  routeExposureBackupFiles:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_BACKUP_FILES"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan guesses backup copies of the server-side files
+      recon found (name.bak, name~, .old, .orig, .save, .dist and the editor's
+      .name.swp) plus root archives and dumps (backup.zip, backup.tar.gz, site.zip,
+      db.sql, dump.sql, database.sql). Each guess is read with HEAD, then a 1 KB
+      Range request, never downloaded in full; an archive, SQL dump or PHP source
+      that differs from a made-up path and from the original file becomes a finding.
+      At most 40 guesses per host. On by default.
+  routeExposureCompareLoggedIn:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_COMPARE_LOGGED_IN"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan also requests each route logged in, with the
+      project's authentication profile, wherever that profile covers the host (its
+      scope hosts, never an RoE-excluded host). The logged-in answer is sent
+      whatever the anonymous one was: it finds routes that return too much to their
+      own user (sensitive_data), and compares bodies to tell a personal page from a
+      public one. Without a profile nothing is sent logged in. Logged-in requests go
+      through the capture proxy only for bearer, basic and cookie profiles. On by
+      default.
+  routeExposureEnabled:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_ENABLED"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    stealth: { set: false }
+    group: attack
+    meaning: >-
+      Whether the route exposure scan runs. It requests the routes recon found
+      (crawl, ffuf, kiterunner, OpenAPI, JS bundles) plus routes it generates,
+      anonymously and, where the authentication profile covers the host, logged in,
+      and writes two kinds of Vulnerability under source route_exposure: leads for
+      the agent to confirm (needs_agent_confirmation true, severity info: a route
+      answering without credentials where authentication was expected, or a response
+      carrying sensitive fields or other people's personal data) and findings a
+      signature proves (exposed .git, .env, web.config, backups, debug consoles and
+      endpoints, debug pages, route catalogs, secrets in a response). It sends GET
+      and HEAD only and never requests a logout, delete, reset or other state-
+      changing path. Personal data is stored as its types and one record count,
+      never a value. It runs in GROUP 6 Phase A whenever active scanning runs
+      (http_probe found live URLs), whatever scanModules says: there is no second
+      level. It needs the routes resource_enum (and js_recon, when on) found.
+  routeExposureMaxRoutesPerHost:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST"
+    unit: count
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    bounds: { min: 10, max: 5000 }
+    group: attack
+    meaning: >-
+      The most routes the route exposure scan requests on one host, per scope group
+      of a Domain batch. Routes with a prior score of 5 or more (an OpenAPI security
+      declaration, a discovery tool's 401/403, an internal path word) and every
+      version-control or env guess go first; the rest are cut and counted as
+      budget_cut.
+  routeExposureMaxRoutesTotal:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_MAX_ROUTES_TOTAL"
+    unit: count
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    bounds: { min: 50, max: 50000 }
+    group: attack
+    meaning: >-
+      The most routes the route exposure scan requests in one invocation, across all
+      hosts, per scope group of a Domain batch. Hosts take turns, so one host never
+      spends the whole budget.
+  routeExposureMaxRps:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_MAX_RPS"
+    unit: rps
+    phase: vuln_scan
+    traffic: active
+    roe_capped: true
+    mcp: settable
+    bounds: { min: 1, max: 50 }
+    group: attack
+    meaning: >-
+      Requests per second the route exposure scan sends across all hosts, shared by
+      every worker and counting control requests, logged-in comparisons and backup
+      reads. It runs at the same time as the other Phase A scanners (nuclei, cache
+      poisoning, GraphQL), so the load on a target is the sum of their rates. One
+      clock serves the whole run, so a Domain batch's groups never reset it. Under
+      an engagement ceiling it is capped to the ceiling at scan start.
+  routeExposurePiiDetection:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_PII_DETECTION"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    meaning: >-
+      Whether the route exposure scan looks for personal data in the answers it
+      reads: e-mail addresses, phone numbers and dates of birth under their keys,
+      card numbers passing Luhn, IBANs with a valid checksum, US SSNs and Italian
+      fiscal codes. It stores the kinds found and the largest count of distinct
+      values, never a value; three or more e-mails or phones in one answer mark
+      other people's records. Sends no extra request. On by default.
+  routeExposureSeedPaths:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_SEED_PATHS"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan requests well-known internal, admin and debug
+      paths (/internal, /api/admin/users, /actuator/env, /console, /phpinfo.php ...)
+      at each base URL and under each API prefix recon saw (/api, /api/v1). At most
+      60 per host. On by default.
+  routeExposureTimeout:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_TIMEOUT"
+    unit: seconds
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    bounds: { min: 2, max: 60 }
+    group: attack
+    meaning: >-
+      Seconds the route exposure scan waits for one answer. A route that times out
+      costs that route only; a host is skipped once it stops answering altogether.
+  routeExposureVcsFiles:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_VCS_FILES"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan requests version-control and environment files
+      at each base URL and under each top-level directory recon saw (a nested
+      application): /.git/HEAD, /.git/config, /.svn/entries, /.svn/wc.db,
+      /.hg/requires, /.env, /.env.local, /.env.production, /.env.bak and
+      /web.config. At most 30 per host. These always get a request, ahead of the
+      budget. On by default.
+  routeExposureVersionVariants:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_VERSION_VARIANTS"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan requests the older API versions of each
+      versioned route recon found: /api/v2/x is tried as /api/v1/x and /api/x, at
+      most 3 per route. An older version that answers anonymously while the newer
+      one is locked is a high-confidence lead. On by default.
+  routeExposureWorkers:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_WORKERS"
+    unit: threads
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    bounds: { min: 1, max: 16 }
+    governor: { model: ratio, floor: 1 }
+    group: attack
+    meaning: >-
+      How many routes the route exposure scan requests at once. The request rate
+      stays capped by routeExposureMaxRps whatever this is. The memory governor
+      scales it down when the host is short of RAM, so the effective value can be
+      below what is written here.
   scaIntelCorrelationEnabled:
     tool: supply_chain_recon
     runtime_key: "SCA_INTEL_CORRELATION_ENABLED"

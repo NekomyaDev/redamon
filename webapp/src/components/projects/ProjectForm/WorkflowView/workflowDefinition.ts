@@ -67,6 +67,7 @@ export const WORKFLOW_TOOLS: WorkflowToolDef[] = [
   { id: 'SubdomainTakeover',  label: 'Subdomain Takeover', enabledField: 'subdomainTakeoverEnabled',   group: 6, badge: 'active' },
   { id: 'VhostSni',           label: 'VHost & SNI',        enabledField: 'vhostSniEnabled',             group: 6, badge: 'active' },
   { id: 'WebCachePoison',     label: 'Cache Poisoning',    enabledField: 'webCachePoisonEnabled',       group: 6, badge: 'active' },
+  { id: 'RouteExposure',      label: 'Route Exposure',     enabledField: 'routeExposureEnabled',        group: 6, badge: 'active' },
 
   // Group 7 - CVE & MITRE
   { id: 'CveLookup', label: 'CVE Lookup', enabledField: 'cveLookupEnabled', group: 7 },

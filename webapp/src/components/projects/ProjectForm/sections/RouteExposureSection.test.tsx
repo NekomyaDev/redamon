@@ -1,0 +1,99 @@
+/**
+ * RouteExposureSection: the enable toggle, every generator and analysis toggle
+ * writes its own field (falling back to the Prisma default), the authentication
+ * hint links to Target & Modules, and the numeric fields come from the registry.
+ *
+ * Run: npx vitest run src/components/projects/ProjectForm/sections/RouteExposureSection.test.tsx
+ */
+import { describe, test, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { RouteExposureSection } from './RouteExposureSection'
+
+vi.mock('../NodeInfoTooltip', () => ({ NodeInfoTooltip: () => null }))
+vi.mock('../RegistryFields', () => ({
+  RegistryFields: ({ keys, title }: { keys: string[]; title: string }) => (
+    <div data-testid="registry-fields" data-title={title}>{keys.join(',')}</div>
+  ),
+}))
+vi.mock('@/components/ui', () => ({
+  WikiInfoButton: ({ target }: { target: string }) => <a data-testid="wiki" data-target={target} />,
+  Toggle: ({ checked, onChange, ...rest }: { checked: boolean; onChange: (v: boolean) => void }) => (
+    <button role="switch" aria-checked={checked} aria-label={(rest as Record<string, string>)['aria-label']}
+            onClick={() => onChange(!checked)} />
+  ),
+}))
+
+afterEach(() => cleanup())
+
+function renderSection(data: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+  const updateField = vi.fn()
+  const view = render(<RouteExposureSection data={data as never} updateField={updateField as never} {...extra} />)
+  return { ...view, updateField }
+}
+
+describe('RouteExposureSection', () => {
+  test('the enable toggle writes routeExposureEnabled', () => {
+    const { updateField } = renderSection({ routeExposureEnabled: false })
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable Route Exposure' }))
+    expect(updateField).toHaveBeenCalledWith('routeExposureEnabled', true)
+  })
+
+  test('the wiki button points at the Route Exposure page', () => {
+    renderSection({ routeExposureEnabled: false })
+    expect(screen.getByTestId('wiki').getAttribute('data-target')).toBe('RouteExposure')
+  })
+
+  test('the body shows only while the module is on', () => {
+    renderSection({ routeExposureEnabled: false })
+    expect(screen.queryByRole('switch', { name: 'Seed paths' })).toBeNull()
+    expect(screen.queryByTestId('registry-fields')).toBeNull()
+    expect(screen.getByText(/never requests logout, delete or reset paths/)).toBeTruthy()
+  })
+
+  test.each([
+    ['Seed paths', 'routeExposureSeedPaths'],
+    ['Version control and env files', 'routeExposureVcsFiles'],
+    ['Backup file variants', 'routeExposureBackupFiles'],
+    ['Older API versions', 'routeExposureVersionVariants'],
+    ['Compare with the logged-in answer', 'routeExposureCompareLoggedIn'],
+    ['Personal data detection', 'routeExposurePiiDetection'],
+  ])('%s writes %s, on by default', (name, field) => {
+    // A project saved before the field existed has no value: the control reads on.
+    const { updateField } = renderSection({ routeExposureEnabled: true })
+    const toggle = screen.getByRole('switch', { name })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(toggle)
+    expect(updateField).toHaveBeenCalledWith(field, false)
+  })
+
+  test('the authentication hint opens Target & Modules', () => {
+    const onOpenAuth = vi.fn()
+    renderSection({ routeExposureEnabled: true }, { onOpenAuth })
+    fireEvent.click(screen.getByRole('button', { name: /Target & Modules > Authentication/ }))
+    expect(onOpenAuth).toHaveBeenCalled()
+  })
+
+  test('without a callback the hint is plain text', () => {
+    renderSection({ routeExposureEnabled: true })
+    expect(screen.getByText(/Without one it still finds routes open to anyone/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Authentication/ })).toBeNull()
+  })
+
+  test('the advanced fields are the five numeric registry keys', () => {
+    renderSection({ routeExposureEnabled: true })
+    const fields = screen.getByTestId('registry-fields')
+    expect(fields.textContent).toBe(
+      'routeExposureMaxRps,routeExposureWorkers,routeExposureTimeout,routeExposureMaxRoutesPerHost,routeExposureMaxRoutesTotal')
+    expect(fields.getAttribute('data-title')).toBe('Advanced')
+  })
+
+  test('Run partial recon shows only in edit mode with the module on', () => {
+    const onRun = vi.fn()
+    renderSection({ routeExposureEnabled: false }, { onRun })
+    expect(screen.queryByText(/Run partial recon/)).toBeNull()
+    cleanup()
+    renderSection({ routeExposureEnabled: true }, { onRun })
+    fireEvent.click(screen.getByText(/Run partial recon/))
+    expect(onRun).toHaveBeenCalled()
+  })
+})

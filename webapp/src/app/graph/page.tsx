@@ -36,6 +36,7 @@ import {
   AiSurfaceTable,
   AiRiskTable,
   WebCachePoisonTable,
+  RouteExposureTable,
 } from './components/RedZoneTables'
 import { ActiveSessions } from './components/ActiveSessions'
 import { RoeViewer } from './components/RoeViewer'
@@ -1833,6 +1834,8 @@ export default function GraphPage() {
               <DnsDriftTable projectId={projectId} />
             ) : tableViewMode === 'webCachePoison' ? (
               <WebCachePoisonTable projectId={projectId} />
+            ) : tableViewMode === 'routeExposure' ? (
+              <RouteExposureTable projectId={projectId} />
             ) : (
               <DataTable
                 data={filterGraphData ?? data}

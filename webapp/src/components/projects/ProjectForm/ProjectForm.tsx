@@ -86,6 +86,7 @@ import { GraphqlScanSection } from './sections/GraphqlScanSection'
 import { TakeoverSection } from './sections/TakeoverSection'
 import { VhostSniSection } from './sections/VhostSniSection'
 import { WebCachePoisonSection } from './sections/WebCachePoisonSection'
+import { RouteExposureSection } from './sections/RouteExposureSection'
 import { PartialReconModal } from './WorkflowView/PartialReconModal'
 import { ReconPresetModal } from './ReconPresetModal'
 import { ProviderRequiredModal, ModelSelectionModal } from './ProjectLlmGate'
@@ -1368,6 +1369,7 @@ export function ProjectForm({
             <VhostSniSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('VhostSni') : undefined} />
             <GraphqlScanSection data={formData} updateField={updateField} projectId={projectId} mode={mode} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('GraphqlScan') : undefined} />
             <WebCachePoisonSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('WebCachePoison') : undefined} />
+            <RouteExposureSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('RouteExposure') : undefined} onOpenAuth={() => setActiveTab('target')} />
           </>
         )}
 

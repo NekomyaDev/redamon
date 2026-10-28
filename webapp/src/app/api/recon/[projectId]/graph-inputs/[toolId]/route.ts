@@ -308,6 +308,7 @@ const TOOL_QUERIES: Record<string, ToolQuery> = {
     }),
   },
   WebCachePoison: JS_TOOL,
+  RouteExposure: JS_TOOL,
   VhostSni: {
     cypher: q => `${q.domains}
       ${q.subPath('')}

@@ -773,6 +773,23 @@ model Project {
   webCachePoisonBehavioralDelay    Float    @default(1.1) @map("web_cache_poison_behavioral_delay")
   webCachePoisonDifferential       Boolean  @default(true) @map("web_cache_poison_differential")
 
+  // ========== ROUTE EXPOSURE ==========
+  // Active GROUP 6 Phase A scanner: requests found and generated routes anonymously
+  // (and logged in where the AuthProfile covers the host); writes leads for the
+  // agent and signature-proven findings. GET/HEAD only.
+  routeExposureEnabled             Boolean  @default(false) @map("route_exposure_enabled")
+  routeExposureMaxRps              Float    @default(5) @map("route_exposure_max_rps")
+  routeExposureWorkers             Int      @default(4) @map("route_exposure_workers")
+  routeExposureTimeout             Int      @default(10) @map("route_exposure_timeout")
+  routeExposureMaxRoutesPerHost    Int      @default(300) @map("route_exposure_max_routes_per_host")
+  routeExposureMaxRoutesTotal      Int      @default(3000) @map("route_exposure_max_routes_total")
+  routeExposureSeedPaths           Boolean  @default(true) @map("route_exposure_seed_paths")
+  routeExposureVcsFiles            Boolean  @default(true) @map("route_exposure_vcs_files")
+  routeExposureBackupFiles         Boolean  @default(true) @map("route_exposure_backup_files")
+  routeExposureVersionVariants     Boolean  @default(true) @map("route_exposure_version_variants")
+  routeExposureCompareLoggedIn     Boolean  @default(true) @map("route_exposure_compare_logged_in")
+  routeExposurePiiDetection        Boolean  @default(true) @map("route_exposure_pii_detection")
+
   // ========== RESOURCE ENUM AI CLASSIFIER ==========
   // Cross-cutting AI classifier — runs after Katana/Hakrawler/GAU/FFuf/jsluice/
   // ParamSpider/Kiterunner/Arjun have produced endpoints. Tags every Endpoint

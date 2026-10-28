@@ -493,6 +493,18 @@ export const reconPresetSchema = z.object({
   webCachePoisonBehavioralOracle: bool,
   webCachePoisonBehavioralDelay: float,
   webCachePoisonDifferential: bool,
+  routeExposureEnabled: bool,
+  routeExposureMaxRps: float,
+  routeExposureWorkers: int,
+  routeExposureTimeout: int,
+  routeExposureMaxRoutesPerHost: int,
+  routeExposureMaxRoutesTotal: int,
+  routeExposureSeedPaths: bool,
+  routeExposureVcsFiles: bool,
+  routeExposureBackupFiles: bool,
+  routeExposureVersionVariants: bool,
+  routeExposureCompareLoggedIn: bool,
+  routeExposurePiiDetection: bool,
 
   // -- CVE Lookup --
   cveLookupEnabled: bool,
@@ -1063,6 +1075,20 @@ OpenAPI source URLs and the project Authenticated Session profile are project-sp
 - webCachePoisonBehavioralOracle: boolean - Detect *silent* caches (no cache-status headers, common with default Varnish/nginx or hardened CDNs) via a frozen-Date probe: fetch twice across a short delay; a frozen Date header + identical body implies a cache. Catches caches header detection alone would miss. Default true.
 - webCachePoisonBehavioralDelay: number - Seconds to wait between the two frozen-Date probes. Larger = more reliable on slow origins, but adds latency per silent URL. Default 1.1.
 - webCachePoisonDifferential: boolean - Non-reflective detection. Beyond looking for a benign canary echoed back, also flag a poison that changes the response *behaviour* (a persisted status code / Location redirect / body) with no echoed marker, guarded against false positives by requiring the affected response dimension to be stable across two clean baselines. Catches CPDoS-style status flips, scheme/redirect poisoning, and cache-key confusion. Adds one extra baseline request per vector. Default true.
+
+## Route Exposure (active, GET/HEAD only)
+- routeExposureEnabled: boolean - Request the routes recon found plus generated ones (internal/admin/debug seed paths, .git/.env/web.config, backup copies, older API versions) without credentials, and logged in where the authentication profile covers the host. Writes info-severity leads the agent's access_control skill confirms (a route answering anonymously where auth was expected, or returning sensitive fields / other people's personal data) and signature findings with real severity (exposed .git, .env, backups, debug consoles, actuator env, debug pages). Never requests logout/delete/reset paths. Runs in GROUP 6 whenever active scanning runs. Good fit for API, web-app and bug-bounty presets. Default false.
+- routeExposureMaxRps: number - Requests per second across all hosts (1-50), capped to the RoE ceiling. Adds to the other Phase A scanners' load. Default 5.
+- routeExposureWorkers: integer - Routes requested at once (1-16). Default 4.
+- routeExposureTimeout: integer - Seconds to wait for one answer (2-60). Default 10.
+- routeExposureMaxRoutesPerHost: integer - Route budget per host (10-5000); OpenAPI-secured, seen-denied and .git/.env routes go first. Default 300.
+- routeExposureMaxRoutesTotal: integer - Route budget per run across hosts (50-50000). Default 3000.
+- routeExposureSeedPaths: boolean - Request well-known internal/admin/debug paths, at most 60 per host. Default true.
+- routeExposureVcsFiles: boolean - Request .git/.svn/.hg/.env/web.config files at each host and top-level folder, at most 30 per host. Default true.
+- routeExposureBackupFiles: boolean - Guess backup copies of server-side files and root archives/dumps, read with HEAD and a 1 KB Range only. Default true.
+- routeExposureVersionVariants: boolean - Try older API versions of versioned routes (/api/v2/x -> /api/v1/x, /api/x). Default true.
+- routeExposureCompareLoggedIn: boolean - Also request each route logged in where the authentication profile covers the host. Default true.
+- routeExposurePiiDetection: boolean - Detect personal data in answers; stores types and one count, never values. Default true.
 
 ## CVE Lookup
 - cveLookupEnabled: boolean

@@ -860,6 +860,20 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'WEB_CACHE_POISON_BEHAVIORAL_ORACLE': True,              # Detect silent caches (no cache headers) via frozen-Date probe
     'WEB_CACHE_POISON_BEHAVIORAL_DELAY': 1.1,                # Seconds between the two frozen-Date probes
     'WEB_CACHE_POISON_DIFFERENTIAL': True,                   # Non-reflective detection (status/location/body diff); adds one baseline probe/vector
+
+    # Route exposure (GROUP 6 Phase A; GET/HEAD only, leads + signature findings)
+    'ROUTE_EXPOSURE_ENABLED': False,
+    'ROUTE_EXPOSURE_MAX_RPS': 5,
+    'ROUTE_EXPOSURE_WORKERS': 4,
+    'ROUTE_EXPOSURE_TIMEOUT': 10,
+    'ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST': 300,
+    'ROUTE_EXPOSURE_MAX_ROUTES_TOTAL': 3000,
+    'ROUTE_EXPOSURE_SEED_PATHS': True,
+    'ROUTE_EXPOSURE_VCS_FILES': True,
+    'ROUTE_EXPOSURE_BACKUP_FILES': True,
+    'ROUTE_EXPOSURE_VERSION_VARIANTS': True,
+    'ROUTE_EXPOSURE_COMPARE_LOGGED_IN': True,
+    'ROUTE_EXPOSURE_PII_DETECTION': True,
 }
 
 
@@ -2244,6 +2258,20 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
     settings['WEB_CACHE_POISON_BEHAVIORAL_ORACLE'] = project.get('webCachePoisonBehavioralOracle', DEFAULT_SETTINGS['WEB_CACHE_POISON_BEHAVIORAL_ORACLE'])
     settings['WEB_CACHE_POISON_BEHAVIORAL_DELAY'] = project.get('webCachePoisonBehavioralDelay', DEFAULT_SETTINGS['WEB_CACHE_POISON_BEHAVIORAL_DELAY'])
     settings['WEB_CACHE_POISON_DIFFERENTIAL'] = project.get('webCachePoisonDifferential', DEFAULT_SETTINGS['WEB_CACHE_POISON_DIFFERENTIAL'])
+
+    # Route Exposure
+    settings['ROUTE_EXPOSURE_ENABLED'] = project.get('routeExposureEnabled', DEFAULT_SETTINGS['ROUTE_EXPOSURE_ENABLED'])
+    settings['ROUTE_EXPOSURE_MAX_RPS'] = project.get('routeExposureMaxRps', DEFAULT_SETTINGS['ROUTE_EXPOSURE_MAX_RPS'])
+    settings['ROUTE_EXPOSURE_WORKERS'] = project.get('routeExposureWorkers', DEFAULT_SETTINGS['ROUTE_EXPOSURE_WORKERS'])
+    settings['ROUTE_EXPOSURE_TIMEOUT'] = project.get('routeExposureTimeout', DEFAULT_SETTINGS['ROUTE_EXPOSURE_TIMEOUT'])
+    settings['ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST'] = project.get('routeExposureMaxRoutesPerHost', DEFAULT_SETTINGS['ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST'])
+    settings['ROUTE_EXPOSURE_MAX_ROUTES_TOTAL'] = project.get('routeExposureMaxRoutesTotal', DEFAULT_SETTINGS['ROUTE_EXPOSURE_MAX_ROUTES_TOTAL'])
+    settings['ROUTE_EXPOSURE_SEED_PATHS'] = project.get('routeExposureSeedPaths', DEFAULT_SETTINGS['ROUTE_EXPOSURE_SEED_PATHS'])
+    settings['ROUTE_EXPOSURE_VCS_FILES'] = project.get('routeExposureVcsFiles', DEFAULT_SETTINGS['ROUTE_EXPOSURE_VCS_FILES'])
+    settings['ROUTE_EXPOSURE_BACKUP_FILES'] = project.get('routeExposureBackupFiles', DEFAULT_SETTINGS['ROUTE_EXPOSURE_BACKUP_FILES'])
+    settings['ROUTE_EXPOSURE_VERSION_VARIANTS'] = project.get('routeExposureVersionVariants', DEFAULT_SETTINGS['ROUTE_EXPOSURE_VERSION_VARIANTS'])
+    settings['ROUTE_EXPOSURE_COMPARE_LOGGED_IN'] = project.get('routeExposureCompareLoggedIn', DEFAULT_SETTINGS['ROUTE_EXPOSURE_COMPARE_LOGGED_IN'])
+    settings['ROUTE_EXPOSURE_PII_DETECTION'] = project.get('routeExposurePiiDetection', DEFAULT_SETTINGS['ROUTE_EXPOSURE_PII_DETECTION'])
 
     # RoE: cap every rate the engagement ceiling applies to.
     apply_roe_rate_cap(settings)
