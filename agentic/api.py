@@ -4653,6 +4653,46 @@ _AUTH_PROFILE_CACHE: dict[str, tuple[float, dict]] = {}
 _AUTH_PROFILE_TTL_SEC = 60.0
 
 
+async def _cached_project(project_id: str) -> dict:
+    """The project row behind replay auth, cached (see _AUTH_PROFILE_CACHE). Raises."""
+    webapp_url = os.environ.get("WEBAPP_API_URL", "http://webapp:3000")
+    def _fetch():
+        import requests as _rq
+        r = _rq.get(f"{webapp_url.rstrip('/')}/api/projects/{project_id}",
+                    headers={"X-Internal-Key": os.environ.get("INTERNAL_API_KEY", "")}, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    import time as _time  # `time` is not imported at module scope in this file
+    from project_settings import seen_project_updated_at
+    _now = _time.time()
+    _hit = _AUTH_PROFILE_CACHE.get(project_id)
+    _seen = seen_project_updated_at(project_id)
+    if (_hit and (_now - _hit[0]) < _AUTH_PROFILE_TTL_SEC
+            and (_seen is None or _hit[1].get("updatedAt") == _seen)):
+        return _hit[1]
+    project = await asyncio.to_thread(_fetch)
+    _AUTH_PROFILE_CACHE[project_id] = (_now, project)
+    return project
+
+
+#: Always credentials, whatever the profile says.
+_CREDENTIAL_HEADERS = frozenset({"cookie", "authorization", "proxy-authorization"})
+
+
+async def _anonymous_strip_names(project_id: str) -> frozenset:
+    """Header names an anonymous send must not carry: the standard credential
+    headers plus every name the project's profile sets (its header, apikey and
+    extraHeaders names), whatever host it is scoped to."""
+    names = set(_CREDENTIAL_HEADERS)
+    try:
+        from auth_profile import build_auth_headers
+        profile = (await _cached_project(project_id)).get("authProfile")
+        names |= {str(k).lower() for k in build_auth_headers(profile or {})}
+    except Exception:  # noqa: BLE001 - the standard names are still stripped
+        pass
+    return frozenset(names)
+
+
 async def _profile_auth_base(project_id: str, txn: dict) -> dict:
     """AuthProfile headers to seed under an in-scope replay/browser send.
 
@@ -4664,24 +4704,7 @@ async def _profile_auth_base(project_id: str, txn: dict) -> dict:
         host = txn.get("host")
         if not host:
             return {}
-        webapp_url = os.environ.get("WEBAPP_API_URL", "http://webapp:3000")
-        def _fetch():
-            import requests as _rq
-            r = _rq.get(f"{webapp_url.rstrip('/')}/api/projects/{project_id}",
-                        headers={"X-Internal-Key": os.environ.get("INTERNAL_API_KEY", "")}, timeout=10)
-            r.raise_for_status()
-            return r.json()
-        import time as _time  # `time` is not imported at module scope in this file
-        from project_settings import seen_project_updated_at
-        _now = _time.time()
-        _hit = _AUTH_PROFILE_CACHE.get(project_id)
-        _seen = seen_project_updated_at(project_id)
-        if (_hit and (_now - _hit[0]) < _AUTH_PROFILE_TTL_SEC
-                and (_seen is None or _hit[1].get("updatedAt") == _seen)):
-            project = _hit[1]
-        else:
-            project = await asyncio.to_thread(_fetch)
-            _AUTH_PROFILE_CACHE[project_id] = (_now, project)
+        project = await _cached_project(project_id)
         profile = project.get("authProfile")
         if not profile:
             return {}
@@ -4727,6 +4750,9 @@ class TrafficReplayRequest(BaseModel):
     mutate: dict = {}
     insertion_point: Optional[str] = None  # fuzz only
     payloads: Optional[list] = None        # fuzz only
+    # The same request with no credentials at all: no profile seeded, and the
+    # origin's Cookie/Authorization/profile headers stripped (an authz check).
+    anonymous: bool = False
 
 
 def _verify_traffic_ctx(ctx: str) -> Optional[dict]:
@@ -4849,8 +4875,12 @@ async def traffic_replay(body: TrafficReplayRequest):
     except Exception:  # noqa: BLE001
         replay_tag = ""
 
-    # Authenticated identity for in-scope hosts (best-effort; {} otherwise).
-    auth_base = await _profile_auth_base(claims["project_id"], txn)
+    # Authenticated identity for in-scope hosts (best-effort; {} otherwise), or
+    # none at all for an anonymous send.
+    if body.anonymous:
+        auth_base, strip = {}, await _anonymous_strip_names(claims["project_id"])
+    else:
+        auth_base, strip = await _profile_auth_base(claims["project_id"], txn), None
 
     try:
         if body.op == "fuzz":
@@ -4860,10 +4890,12 @@ async def traffic_replay(body: TrafficReplayRequest):
             payloads = [str(x) for x in (body.payloads or [])[:200]]
             if not ip or not payloads:
                 return JSONResponse(status_code=400, content={"error": "fuzz requires insertion_point + payloads"})
-            sends = [{"payload": pl, "curl_args": args} for pl, args in build_fuzz_curls(txn, ip, payloads, auth_base=auth_base)]
+            sends = [{"payload": pl, "curl_args": args}
+                     for pl, args in build_fuzz_curls(txn, ip, payloads, auth_base=auth_base, strip_headers=strip)]
         else:
             mutate = body.mutate if isinstance(body.mutate, dict) else {}
-            sends = [{"payload": None, "curl_args": build_replay_curl(txn, mutate, auth_base=auth_base)}]
+            sends = [{"payload": None,
+                      "curl_args": build_replay_curl(txn, mutate, auth_base=auth_base, strip_headers=strip)}]
     except ValueError as e:
         # Host-pin / scope violation (F1) or a malformed mutate — refuse, fail closed.
         return JSONResponse(status_code=400, content={"error": f"replay refused: {str(e)[:200]}"})
@@ -4880,7 +4912,8 @@ async def traffic_replay(body: TrafficReplayRequest):
             "error": f"replay send budget exhausted for this session ({used}/{budget}); refusing {len(sends)} more"})
     _TRAFFIC_REPLAY_SENDS[bkey] = used + len(sends)
 
-    return JSONResponse(content={"sends": sends, "ctx": replay_tag})
+    return JSONResponse(content={"sends": sends, "ctx": replay_tag,
+                                 "identity": "anonymous" if body.anonymous else "session"})
 
 
 # Per-session browser-action budget for /traffic/browser. proxy_brain's
@@ -4908,6 +4941,7 @@ class TrafficBrowserRequest(BaseModel):
     action: str  # open | navigate | interact | eval
     origin_id: str
     url: Optional[str] = None  # navigate only (for the host-pin check)
+    anonymous: bool = False    # open only: no session in the browser context
 
 
 @app.post("/traffic/browser", tags=["Traffic"], dependencies=[Depends(require_internal_auth_only)])
@@ -4992,13 +5026,14 @@ async def traffic_browser(body: TrafficBrowserRequest):
         # to the origin transaction's host, which _profile_auth_base scope-checks,
         # so the session rides every request the page makes (best-effort, {} when
         # no profile / out of scope). Same write-only channel as the ctx tag.
-        auth_headers = await _profile_auth_base(claims["project_id"], txn)
+        auth_headers = {} if body.anonymous else await _profile_auth_base(claims["project_id"], txn)
         return JSONResponse(content={
             "origin_host": origin_host,
             "scheme": origin_scheme,
             "port": origin_port,
             "ctx": cap_tag,
             "auth_headers": auth_headers,
+            "identity": "anonymous" if body.anonymous else "session",
         })
 
     return JSONResponse(content={"ok": True})
