@@ -1,0 +1,85 @@
+# Expected results of the route exposure scan against this lab (plan §14, §22.2).
+#
+# Keyed by service ROLE and path, never by address: the lab takes
+# <prefix>.93-.96 of whatever subnet redamon-network has. `kind` is the
+# finding's exposure_kind; `fields` are exact values the finding must carry.
+# A scenario passes when every expected row is seen AND nothing unexpected is.
+
+roles:
+  main: 93
+  twin: 94
+  hostile: 95
+  outsider: 96
+
+# Every finding a v1 run with all generators on and a bearer profile writes.
+v1_findings:
+  - {role: main, path: /internal/users/export, kind: anonymous_access, fields: {generated_by: found}}
+  - {role: main, path: /internal/users/export, kind: sensitive_data, fields: {pii_types: [email]}}
+  - {role: main, path: /api/v2/reports/export, kind: anonymous_access, fields: {confidence: 0.9}, expected_by: [openapi]}
+  - {role: main, path: /api/v1/orders/42, kind: anonymous_access, fields: {generated_by: version, route_class: old_version, variant_of: /api/v2/orders/42}, expected_by: [version_locked]}
+  - {role: main, path: /api/admin/export, kind: anonymous_access, fields: {generated_by: seed}, expected_by: [siblings_locked]}
+  - {role: main, path: /api/admin/help, kind: anonymous_access, fields: {confidence: 0.4, auth_expected_by: [path_word]}}
+  - {role: main, path: /api/users/me, kind: sensitive_data, fields: {anon_status: 401, authed_status: 200}, needs_auth: true}
+  - {role: main, path: /uploads/invoice-1001.pdf, kind: anonymous_access, fields: {route_class: uploaded_content}, needs_auth: true}
+  - {role: main, path: /.git/HEAD, kind: vcs_exposure, fields: {severity: high}}
+  - {role: main, path: /.git/config, kind: vcs_exposure, fields: {severity: high}}
+  - {role: main, path: /.env, kind: env_file, fields: {severity: high}}
+  - {role: main, path: /web.config, kind: config_file, fields: {severity: medium}}
+  - {role: main, path: /config.php.bak, kind: backup_file, fields: {severity: medium}}
+  - {role: main, path: /backup.zip, kind: backup_file, fields: {severity: medium}}
+  - {role: main, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}}
+  - {role: main, path: /debug/error, kind: debug_page, fields: {anon_status: 500}}
+  - {role: main, path: /console, kind: debug_console, fields: {severity: high}}
+  - {role: main, path: /phpinfo.php, kind: debug_page, fields: {severity: medium}}
+  - {role: twin, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}, only_when_role: twin}
+  - {role: hostile, path: /xss-snippet, kind: anonymous_access}
+  - {role: hostile, path: /xss-snippet, kind: sensitive_data}
+  - {role: hostile, path: /backup.tar.gz, kind: backup_file, note: "HEAD answers 405, so the Range read decides"}
+
+# Paths that must produce no finding at all.
+v1_absent:
+  - {role: main, path: /api/v2/orders/42}
+  - {role: main, path: /api/admin/users}
+  - {role: main, path: /api/admin/roles}
+  - {role: main, path: /api/admin/audit}
+  - {role: main, path: /api/status}
+  - {role: main, path: /admin}
+  - {role: hostile, path: /spa/admin}
+  - {role: hostile, path: /api/missing/internal}
+  - {role: hostile, path: /wall/admin}
+  - {role: hostile, path: /redirect-internal}
+
+# Endpoint.anon_status on routes recon already had.
+v1_anon_status:
+  - {role: main, path: /api/v2/orders/42, status: 401}
+
+# Hit-log rules, inside the module's own window (summary.started_at .. finished_at).
+hit_rules:
+  zero_paths: [/logout, /account/reset]
+  only_methods: [GET, HEAD]
+  head_and_range_only: [/backup.zip]
+  never_full_get: [/backup.zip, /backup.tar.gz]
+  outsider_zero_whole_scan: true
+  rate_slack: 1.10
+
+# Agent campaign: values the transcripts must never contain (matched by rule
+# name; the values themselves come from /tmp/lab-secrets.json at run time).
+agent_leak_rules:
+  static: [lab-token, lab-key, sid=lab-user-1, "@lab.invalid"]
+  from_secrets: [env_db_password, github_token, git_blob_secret, heap_password, heap_aws_key]
+
+scenarios:
+  S1: {phase: v1, roles: [main, hostile], auth: bearer, settings: {}}
+  S2: {phase: v1, roles: [main, hostile], auth: none, settings: {}}
+  S3: {phase: v1, roles: [main, hostile], auth: cookie, settings: {}}
+  S4: {phase: v1, roles: [main, hostile], auth: header, settings: {}}
+  S5-seed: {phase: v1, roles: [main], auth: bearer, settings: {routeExposureSeedPaths: false}}
+  S5-vcs: {phase: v1, roles: [main], auth: bearer, settings: {routeExposureVcsFiles: false}}
+  S5-backup: {phase: v1, roles: [main], auth: bearer, settings: {routeExposureBackupFiles: false}}
+  S5-version: {phase: v1, roles: [main], auth: bearer, settings: {routeExposureVersionVariants: false}}
+  S6-compare: {phase: v1, roles: [main], auth: bearer, settings: {routeExposureCompareLoggedIn: false}}
+  S6-pii: {phase: v1, roles: [main], auth: bearer, settings: {routeExposurePiiDetection: false}}
+  S7: {phase: v1, roles: [main, twin], auth: none, settings: {roeExcludedHosts: ["<twin>"]}}
+  S8: {phase: v1, roles: [main], auth: none, settings: {roeGlobalMaxRps: 2}}
+  S10: {phase: v1, roles: [main], auth: none, settings: {stealthMode: true}}
+  S11: {phase: v1, roles: [main, hostile], auth: none, settings: {routeExposureMaxRoutesPerHost: 10, routeExposureMaxRoutesTotal: 50}}
