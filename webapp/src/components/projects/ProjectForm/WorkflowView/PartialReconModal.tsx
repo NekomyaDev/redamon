@@ -995,6 +995,8 @@ export function PartialReconModal({
               ? 'No BaseURLs found in graph. Run HTTP Probing (Httpx) first to discover live URLs, or provide custom URLs below.'
               : isArjun
               ? 'No BaseURLs or Endpoints found in graph. Run Resource Enumeration (Katana/Hakrawler) first, or provide custom URLs below.'
+              : isRouteExposure
+              ? 'No BaseURLs or Endpoints found in graph. Run HTTP Probing (Httpx) and Resource Enumeration first, or provide custom URLs below.'
               : isSecurityChecks
               ? 'No IPs, subdomains, or BaseURLs found in graph. Run Subdomain Discovery and HTTP Probing first to populate the graph.'
               : toolId === 'Shodan'
