@@ -40,6 +40,8 @@ interface AttackSkillsSectionProps {
    * API call; only create-mode toggles go through `updateField`.
    */
   projectId?: string | null
+  /** Opens the RoE tab; absent in the chat SettingsModal, which has no tabs. */
+  onOpenRoe?: () => void
 }
 
 interface BuiltInSkillDef {
@@ -184,7 +186,7 @@ function getConfig(data: FormData): AttackSkillConfig {
   return DEFAULT_CONFIG
 }
 
-export function AttackSkillsSection({ data, updateField, projectId }: AttackSkillsSectionProps) {
+export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }: AttackSkillsSectionProps) {
   const { userId } = useProject()
   const { alertError, alert: showAlert } = useAlertModal()
   const [builtInOpen, setBuiltInOpen] = useState(true)
@@ -449,10 +451,10 @@ export function AttackSkillsSection({ data, updateField, projectId }: AttackSkil
                       <SsrfSection data={data} updateField={updateField} />
                     )}
                     {enabled && skill.id === 'rce' && (
-                      <RceSection data={data} updateField={updateField} />
+                      <RceSection data={data} updateField={updateField} onOpenRoe={onOpenRoe} />
                     )}
                     {enabled && skill.id === 'path_traversal' && (
-                      <PathTraversalSection data={data} updateField={updateField} />
+                      <PathTraversalSection data={data} updateField={updateField} onOpenRoe={onOpenRoe} />
                     )}
                     {enabled && skill.id === 'deserialization' && (
                       <DeserializationSection data={data} updateField={updateField} />

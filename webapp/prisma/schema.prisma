@@ -1312,6 +1312,8 @@ model Project {
   rceOobCallbackEnabled                 Boolean  @default(true) @map("rce_oob_callback_enabled")
   rceDeserializationEnabled             Boolean  @default(true) @map("rce_deserialization_enabled")
   rceAggressivePayloads                 Boolean  @default(false) @map("rce_aggressive_payloads")
+  // Route exposure: download an exposed heap dump once, count its credential shapes, delete it.
+  rceHeapdumpAnalysisEnabled            Boolean  @default(false) @map("rce_heapdump_analysis_enabled")
 
   // ========== PATH TRAVERSAL / LFI / RFI SETTINGS ==========
   pathTraversalOobCallbackEnabled       Boolean  @default(true)  @map("path_traversal_oob_callback_enabled")
@@ -1320,6 +1322,9 @@ model Project {
   pathTraversalPayloadReferenceEnabled  Boolean  @default(true)  @map("path_traversal_payload_reference_enabled")
   pathTraversalRequestTimeout           Int      @default(10)    @map("path_traversal_request_timeout")
   pathTraversalOobProvider              String   @default("oast.fun") @map("path_traversal_oob_provider")
+  // Route exposure: rebuild an exposed .git in kali and count its secrets; validate a found secret.
+  pathTraversalGitReconstructEnabled    Boolean  @default(false) @map("path_traversal_git_reconstruct_enabled")
+  pathTraversalValidateSecretsEnabled   Boolean  @default(false) @map("path_traversal_validate_secrets_enabled")
 
   // ========== INSECURE DESERIALIZATION SETTINGS ==========
   deserializationOobCallbackEnabled     Boolean  @default(true)  @map("deserialization_oob_callback_enabled")

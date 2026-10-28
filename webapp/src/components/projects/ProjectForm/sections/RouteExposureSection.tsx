@@ -26,6 +26,10 @@ interface RouteExposureSectionProps {
 export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: RouteExposureSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const enabled = !!data.routeExposureEnabled
+  // Read as the agent reads it (get_enabled_builtin_skills): only a truthy value
+  // is on, so a project saved before a skill existed shows the alert.
+  const builtIn = (data.attackSkillConfig as { builtIn?: Record<string, unknown> } | null)?.builtIn ?? {}
+  const skillOn = (id: string) => !!builtIn[id]
 
   return (
     <div className={`${styles.section} ${styles.formSkin}`}>
@@ -67,6 +71,18 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: R
             agent to confirm, and findings a signature proves (exposed .git and .env files, backups, debug
             consoles). Sends GET and HEAD only and never requests logout, delete or reset paths.
           </p>
+
+          {enabled && !skillOn('access_control') && (
+            <p className={`${styles.fieldHint} ${styles.fieldHintCaution}`} role="alert">
+              <strong>Half a cycle.</strong> Recon writes leads, but nothing confirms them: turn on Access Control in
+              AI Agent &gt; Attack Skills.
+            </p>
+          )}
+          {enabled && (!skillOn('path_traversal') || !skillOn('rce')) && (
+            <p className={styles.fieldHint}>
+              Exposed files and consoles are proven by Path Traversal and RCE.
+            </p>
+          )}
 
           {enabled && (
             <>

@@ -1,7 +1,8 @@
 /**
  * RouteExposureSection: the enable toggle, every generator and analysis toggle
  * writes its own field (falling back to the Prisma default), the authentication
- * hint links to Target & Modules, and the numeric fields come from the registry.
+ * hint links to Target & Modules, the numeric fields come from the registry, and
+ * the "Half a cycle" alert reads the attack skills as the agent does.
  *
  * Run: npx vitest run src/components/projects/ProjectForm/sections/RouteExposureSection.test.tsx
  */
@@ -85,6 +86,39 @@ describe('RouteExposureSection', () => {
     expect(fields.textContent).toBe(
       'routeExposureMaxRps,routeExposureWorkers,routeExposureTimeout,routeExposureMaxRoutesPerHost,routeExposureMaxRoutesTotal')
     expect(fields.getAttribute('data-title')).toBe('Advanced')
+  })
+
+  const skills = (builtIn: Record<string, unknown>) => ({ attackSkillConfig: { builtIn, user: {} } })
+
+  test('the alert shows when Access Control is off, and only with the module on', () => {
+    renderSection({ routeExposureEnabled: true, ...skills({ access_control: false }) })
+    expect(screen.getByRole('alert').textContent).toMatch(/Half a cycle.*turn on Access Control/)
+    cleanup()
+    renderSection({ routeExposureEnabled: false, ...skills({ access_control: false }) })
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test.each([
+    ['a missing key', {}],
+    ['no attackSkillConfig at all', null],
+  ])('%s counts as off, as in the agent', (_label, builtIn) => {
+    const data = builtIn === null ? { routeExposureEnabled: true } : { routeExposureEnabled: true, ...skills(builtIn) }
+    renderSection(data)
+    expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  test('with all three skills on there is neither the alert nor the hint', () => {
+    renderSection({ routeExposureEnabled: true, ...skills({ access_control: true, path_traversal: true, rce: true }) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText(/proven by Path Traversal and RCE/)).toBeNull()
+  })
+
+  test.each(['path_traversal', 'rce'])('with %s off only the softer hint shows', (off) => {
+    const builtIn: Record<string, boolean> = { access_control: true, path_traversal: true, rce: true }
+    builtIn[off] = false
+    renderSection({ routeExposureEnabled: true, ...skills(builtIn) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText(/proven by Path Traversal and RCE/)).toBeTruthy()
   })
 
   test('Run partial recon shows only in edit mode with the module on', () => {

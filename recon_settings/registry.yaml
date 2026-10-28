@@ -6814,6 +6814,22 @@ fields:
       Whether Path traversal runs. Configuration is two levels: this flag decides
       whether the tool runs INSIDE its phase, and scanModules decides whether the
       phase runs at all. Setting one without the other is a silent no-op.
+  pathTraversalGitReconstructEnabled:
+    tool: path_traversal
+    runtime_key: null
+    unit: none
+    phase: standalone
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Lets the path_traversal skill reconstruct a repository from an exposed .git
+      that recon's route exposure scan found: it walks the loose objects in the Kali
+      sandbox (500 objects, 20 MiB, 240 s at most), scans them for secrets, reports
+      counts and types only, and deletes them. Also needs data exfiltration allowed
+      in the Rules of Engagement. Takes effect only while route exposure is on. Off
+      by default.
   pathTraversalOobCallbackEnabled:
     tool: path_traversal
     runtime_key: null
@@ -6881,6 +6897,20 @@ fields:
       How long Path traversal may spend before it is abandoned, in seconds. A run
       that hits it contributes whatever it found so far rather than failing the
       scan.
+  pathTraversalValidateSecretsEnabled:
+    tool: path_traversal
+    runtime_key: null
+    unit: none
+    phase: standalone
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: egress
+    meaning: >-
+      Lets the path_traversal skill check a secret found in an exposed file with one
+      identity-only call to its provider (AWS, GitHub, GitLab, Slack). The provider
+      sees the call, and a canary token alerts its owner. Takes effect only while
+      route exposure is on. Off by default.
   phishingSmtpConfig:
     tool: phishing
     runtime_key: null
@@ -7020,6 +7050,21 @@ fields:
       Whether rce runs. Configuration is two levels: this flag decides whether the
       tool runs INSIDE its phase, and scanModules decides whether the phase runs
       at all. Setting one without the other is a silent no-op.
+  rceHeapdumpAnalysisEnabled:
+    tool: rce
+    runtime_key: null
+    unit: none
+    phase: standalone
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Lets the rce skill download an exposed Spring heap dump once (512 MiB at
+      most), count the credential shapes in it, and delete it. Also needs data
+      exfiltration allowed and sensitive data handling above "no access" in the
+      Rules of Engagement. Takes effect only while route exposure is on. Off by
+      default.
   rceOobCallbackEnabled:
     tool: rce
     runtime_key: null

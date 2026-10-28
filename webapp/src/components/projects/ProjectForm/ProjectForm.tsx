@@ -1412,7 +1412,8 @@ export function ProjectForm({
         )}
 
         {activeTab === 'attack' && (
-          <AttackSkillsSection data={formData} updateField={updateField} projectId={mode === 'edit' ? projectId : null} />
+          <AttackSkillsSection data={formData} updateField={updateField} projectId={mode === 'edit' ? projectId : null}
+                               onOpenRoe={() => setActiveTab('roe' as TabId)} />
         )}
 
         {activeTab === 'cypherfix' && (
