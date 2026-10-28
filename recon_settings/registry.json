@@ -11198,7 +11198,7 @@
    "group": "attack",
    "has_default": true,
    "mcp": "settable",
-   "meaning": "Requests per second the route exposure scan sends across all hosts, shared by every worker and counting control requests, logged-in comparisons and backup reads. It runs at the same time as the other Phase A scanners (nuclei, cache poisoning, GraphQL), so the load on a target is the sum of their rates. One clock serves the whole run, so a Domain batch's groups never reset it. Under an engagement ceiling it is capped to the ceiling at scan start.",
+   "meaning": "Requests per second the route exposure scan sends across all hosts, shared by every worker and counting control requests, logged-in comparisons and backup reads. It runs at the same time as the other Phase A scanners (nuclei, cache poisoning, GraphQL), so the load on a target is the sum of their rates. One clock serves the whole run, so a Domain batch's groups never reset it.",
    "optional": false,
    "phase": "vuln_scan",
    "prisma_type": "Float",
