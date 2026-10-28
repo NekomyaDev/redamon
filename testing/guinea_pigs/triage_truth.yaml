@@ -121,6 +121,42 @@ web-cache-poisoning:
     - type: cache_control_missing
       grade: 1
 
+route_exposure_lab:
+  description: >
+    The route exposure lab (testing/guinea_pigs/route_exposure_lab). Its
+    signature findings are real exposures; its leads are graded 0 because a
+    pending lead is not actionable until the agent confirms it, and the class
+    table must rank the proven artifacts above them.
+  findings:
+    - type: exposed_debug_console
+      grade: 2
+    - type: exposed_env_file
+      grade: 2
+    - type: exposed_version_control
+      grade: 2
+    - type: exposed_debug_endpoint
+      grade: 2
+    - type: exposed_backup_file
+      grade: 2
+    - type: exposed_config_file
+      grade: 1
+    - type: debug_error_page
+      grade: 1
+    - type: exposed_route_catalog
+      grade: 1
+    - type: secret_exposure
+      grade: 1
+    - type: unauthenticated_endpoint
+      grade: 0
+      note: a pending lead; the agent's CONFIRMS edge is what makes it actionable
+    - type: sensitive_data_exposure
+      grade: 0
+      note: a pending lead, as above
+    - type: cors_credentialed_origin_reflection
+      grade: 1
+    - type: authenticated_content_cacheable
+      grade: 1
+
 synthetic_dev_shape:
   description: >
     Fixture-only (no container). Built by
