@@ -84,6 +84,11 @@ def reset_hits() -> None:
                        check=False, capture_output=True)
 
 
+#: The generator each S5 toggle turns off, as a finding's generated_by names it.
+GENERATOR_TOGGLES = {"routeExposureSeedPaths": "seed", "routeExposureVcsFiles": "vcs",
+                     "routeExposureBackupFiles": "backup", "routeExposureVersionVariants": "version"}
+
+
 def scenario_settings(name: str) -> dict:
     sc = EXPECTED["scenarios"][name]
     settings = {
@@ -192,23 +197,43 @@ def verify(name: str, project_id: str) -> int:
     got = {(_role_of(f["baseurl"]), f["path"], f["exposure_kind"]): f for f in findings}
     disabled = {k for k, v in (sc.get("settings") or {}).items() if v is False}
     auth = sc["auth"] != "none" and "routeExposureCompareLoggedIn" not in disabled
-    expected = []
+    off_gens = {GENERATOR_TOGGLES[k] for k in disabled if k in GENERATOR_TOGGLES}
+    pii_off = "routeExposurePiiDetection" in disabled
+    excluded_roles = {v[1:-1] for v in (sc.get("settings") or {}).get("roeExcludedHosts", [])
+                      if isinstance(v, str) and v.startswith("<")}
+    ran = "route_exposure" in (data.get("metadata") or {}).get("modules_executed", [])
+    expected, must_be_absent = [], []
     for row in EXPECTED["v1_findings"]:
         if row["role"] not in sc["roles"]:
+            continue
+        if row.get("gen") in off_gens or row["role"] in excluded_roles:
+            must_be_absent.append(row)
             continue
         if row.get("needs_auth") and not auth:
             continue
         if row.get("needs") and row["needs"] not in (sc.get("needs") or []):
             continue
         expected.append(row)
-    if not disabled and "roeExcludedHosts" not in (sc.get("settings") or {}) and summary.get("budget_cut", 0) == 0:
+    if not ran:
+        if findings:
+            failures.append(f"the module did not run but {len(findings)} finding(s) were written")
+    elif summary.get("budget_cut", 0) == 0:
+        for row in must_be_absent:
+            if (row["role"], row["path"], row["kind"]) in got:
+                failures.append(f"{(row['role'], row['path'], row['kind'])} must be absent "
+                                f"(generator {row.get('gen')} off or host excluded)")
+        if pii_off:
+            for key, f in got.items():
+                if f.get("pii_types"):
+                    failures.append(f"{key}: pii_types {f['pii_types']} with personal data detection off")
         for row in expected:
             key = (row["role"], row["path"], row["kind"])
             f = got.get(key)
             if f is None:
                 failures.append(f"missing {key}")
                 continue
-            problems = _match(f, row)
+            problems = _match(f, {**row, "fields": {k: v for k, v in (row.get("fields") or {}).items()
+                                                    if not (pii_off and k == "pii_types")}})
             if problems:
                 failures.append(f"{key}: " + "; ".join(problems))
         expected_keys = {(r["role"], r["path"], r["kind"]) for r in expected}
@@ -225,7 +250,10 @@ def verify(name: str, project_id: str) -> int:
 
     # Hit logs, inside the module's window.
     if summary.get("started_at"):
-        lo, hi = _ts(summary["started_at"]) - 0.5, _ts(summary["finished_at"]) + 0.5
+        # No slack before the start: the scan and the lab share the host clock, and
+        # JS recon's unpaced endpoint probes (it GETs every URL a bundle names,
+        # /logout included) end just before the module starts.
+        lo, hi = _ts(summary["started_at"]), _ts(summary["finished_at"]) + 0.5
         rules = EXPECTED["hit_rules"]
         for role in sc["roles"]:
             window = [h for h in hits(role) if lo <= h["t"] <= hi]
@@ -233,8 +261,13 @@ def verify(name: str, project_id: str) -> int:
             if bad_methods:
                 failures.append(f"{role}: methods {sorted(bad_methods)} in the module window")
             for path in rules["zero_paths"]:
-                if any(h["path"].split("?", 1)[0] == path for h in window):
+                offending = [h for h in window if h["path"].split("?", 1)[0] == path]
+                if offending:
                     failures.append(f"{role}: {path} was requested")
+                    # Who sent it is not in the log; when and how is, relative to the window.
+                    for h in offending[:5]:
+                        report.append(f"  - {role} {h['method']} {h['path'][:80]} at window+{h['t'] - lo:.2f}s "
+                                      f"(auth={h['auth']} cookie={h['cookie']} api_key={h['api_key']} status={h['status']})")
             for path in rules["never_full_get"]:
                 if any(h["path"] == path and h["method"] == "GET" and not h["range"] for h in window):
                     failures.append(f"{role}: a full GET of {path}")

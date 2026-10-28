@@ -15,31 +15,32 @@ roles:
 # `needs: openapi` rows need the main spec set as an OpenAPI source (a UI step:
 # openapiSources is closed to MCP); `needs: keep_docs` rows need a crawl that keeps
 # .pdf, which katana's default exclude patterns drop. A scenario opts in with
-# `needs: [...]`.
+# `needs: [...]`. `gen` is the generator that produces the row: turning that
+# generator off must remove the row and nothing else.
 v1_findings:
-  - {role: main, path: /internal/users/export, kind: anonymous_access, fields: {generated_by: found}}
-  - {role: main, path: /internal/users/export, kind: sensitive_data, fields: {pii_types: [email]}}
-  - {role: main, path: /api/v2/reports/export, kind: anonymous_access, fields: {confidence: 0.9}, expected_by: [openapi], needs: openapi}
-  - {role: main, path: /api/v1/orders/42, kind: anonymous_access, fields: {generated_by: version, route_class: old_version, variant_of: /api/v2/orders/42}, expected_by: [version_locked]}
-  - {role: main, path: /api/admin/export, kind: anonymous_access, fields: {generated_by: seed}, expected_by: [siblings_locked]}
-  - {role: main, path: /api/admin/help, kind: anonymous_access, fields: {confidence: 0.4, auth_expected_by: [path_word]}}
-  - {role: main, path: /api/users/me, kind: sensitive_data, fields: {anon_status: 401, authed_status: 200}, needs_auth: true}
-  - {role: main, path: /uploads/invoice-1001.pdf, kind: anonymous_access, fields: {route_class: uploaded_content}, needs_auth: true, needs: keep_docs}
-  - {role: main, path: /.git/HEAD, kind: vcs_exposure, fields: {severity: high}}
-  - {role: main, path: /.git/config, kind: vcs_exposure, fields: {severity: high}}
-  - {role: main, path: /.env, kind: env_file, fields: {severity: high}}
-  - {role: main, path: /web.config, kind: config_file, fields: {severity: medium}}
-  - {role: main, path: /config.php.bak, kind: backup_file, fields: {severity: medium}}
-  - {role: main, path: /backup.zip, kind: backup_file, fields: {severity: medium}}
-  - {role: main, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}}
-  - {role: main, path: /debug/error, kind: debug_page, fields: {anon_status: 500}}
-  - {role: main, path: /console, kind: debug_console, fields: {severity: high}}
-  - {role: main, path: /console-open, kind: debug_console, fields: {severity: high}}
-  - {role: main, path: /phpinfo.php, kind: debug_page, fields: {severity: medium}}
-  - {role: twin, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}, only_when_role: twin}
-  - {role: hostile, path: /xss-snippet, kind: anonymous_access}
-  - {role: hostile, path: /xss-snippet, kind: sensitive_data}
-  - {role: hostile, path: /backup.tar.gz, kind: backup_file, note: "HEAD answers 405, so the Range read decides"}
+  - {role: main, path: /internal/users/export, kind: anonymous_access, fields: {generated_by: found}, gen: found}
+  - {role: main, path: /internal/users/export, kind: sensitive_data, fields: {pii_types: [email]}, gen: found}
+  - {role: main, path: /api/v2/reports/export, kind: anonymous_access, fields: {confidence: 0.9}, expected_by: [openapi], needs: openapi, gen: found}
+  - {role: main, path: /api/v1/orders/42, kind: anonymous_access, fields: {generated_by: version, route_class: old_version, variant_of: /api/v2/orders/42}, expected_by: [version_locked], gen: version}
+  - {role: main, path: /api/admin/export, kind: anonymous_access, fields: {generated_by: seed}, expected_by: [siblings_locked], gen: seed}
+  - {role: main, path: /api/admin/help, kind: anonymous_access, fields: {confidence: 0.4, auth_expected_by: [path_word]}, gen: found}
+  - {role: main, path: /api/users/me, kind: sensitive_data, fields: {anon_status: 401, authed_status: 200}, needs_auth: true, gen: found}
+  - {role: main, path: /uploads/invoice-1001.pdf, kind: anonymous_access, fields: {route_class: uploaded_content}, needs_auth: true, needs: keep_docs, gen: found}
+  - {role: main, path: /.git/HEAD, kind: vcs_exposure, fields: {severity: high}, gen: vcs}
+  - {role: main, path: /.git/config, kind: vcs_exposure, fields: {severity: high}, gen: vcs}
+  - {role: main, path: /.env, kind: env_file, fields: {severity: high}, gen: vcs}
+  - {role: main, path: /web.config, kind: config_file, fields: {severity: medium}, gen: vcs}
+  - {role: main, path: /config.php.bak, kind: backup_file, fields: {severity: medium}, gen: backup}
+  - {role: main, path: /backup.zip, kind: backup_file, fields: {severity: medium}, gen: backup}
+  - {role: main, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}, gen: seed}
+  - {role: main, path: /debug/error, kind: debug_page, fields: {anon_status: 500}, gen: found}
+  - {role: main, path: /console, kind: debug_console, fields: {severity: high}, gen: seed}
+  - {role: main, path: /console-open, kind: debug_console, fields: {severity: high}, gen: found}
+  - {role: main, path: /phpinfo.php, kind: debug_page, fields: {severity: medium}, gen: seed}
+  - {role: twin, path: /actuator/env, kind: debug_endpoint, fields: {severity: high}, only_when_role: twin, gen: seed}
+  - {role: hostile, path: /xss-snippet, kind: anonymous_access, gen: found}
+  - {role: hostile, path: /xss-snippet, kind: sensitive_data, gen: found}
+  - {role: hostile, path: /backup.tar.gz, kind: backup_file, note: "HEAD answers 405, so the Range read decides", gen: backup}
 
 # Paths that must produce no finding at all.
 v1_absent:
