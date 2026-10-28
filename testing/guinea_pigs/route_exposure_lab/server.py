@@ -128,6 +128,7 @@ const api = {
   me: () => fetch('/api/users/me'),
   exportUsers: () => fetch('/internal/users/export'),
   reportError: () => fetch('/debug/error'),
+  debugConsole: () => fetch('/console-open'),
   logout: () => fetch('/logout'),
   reset: () => fetch('/account/reset'),
   track: () => fetch('http://OUTSIDER/api/track'),

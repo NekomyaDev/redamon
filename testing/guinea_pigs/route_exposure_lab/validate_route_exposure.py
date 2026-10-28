@@ -5,6 +5,8 @@
     python3 validate_route_exposure.py start <projectId>      # after the AuthProfile is set in the UI
     python3 validate_route_exposure.py verify S1 <projectId>  # wait, then compare with expected_results.yaml
     python3 validate_route_exposure.py reset-hits             # empty every service's hit log
+    python3 validate_route_exposure.py agent-mark AG1         # just before the prompt is sent
+    python3 validate_route_exposure.py agent-verify AG1 <projectId> [sessionId]
     python3 validate_route_exposure.py agent-leaks <transcript.json>
 
 Reads MCP_SERVER_TOKEN from the repo .env (through mcp_client) and never prints
@@ -12,12 +14,18 @@ it. The AuthProfile cannot be set over MCP: set it in the UI between `setup`
 and `start` for the scenarios that need one. Traffic is attributed by the
 module's own window (route_exposure.summary.started_at .. finished_at):
 katana, arjun and the other crawlers hit the lab earlier in the same scan.
+
+An agent scenario (plan §23.13) is driven in the browser; `agent-mark` empties
+the hit logs and opens its window, `agent-verify` reads the session's CONFIRMS
+edges over MCP, the hit logs since the mark, the Kali sandbox's /tmp and the
+transcript (saved under reports/agent/, gitignored), and runs the leak scan.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -86,7 +94,13 @@ def scenario_settings(name: str) -> dict:
         # Every other Phase A sender off, so the module is alone in its window.
         "webCachePoisonEnabled": False, "graphqlSecurityEnabled": False,
         "subdomainTakeoverEnabled": False, "vhostSniEnabled": False, "originDiscoveryEnabled": False,
+        # Tools that feed no route to the matrix, off to keep a run short: arjun
+        # only adds parameters (and POSTs), AI surface recon and Shodan add none.
+        "arjunEnabled": False, "aiSurfaceReconEnabled": False, "shodanEnabled": False,
     }
+    if "keep_docs" in (sc.get("needs") or []):
+        defaults = json.loads((REPO / "recon_settings" / "registry.json").read_text())["fields"]
+        settings["katanaExcludePatterns"] = [p for p in defaults["katanaExcludePatterns"]["default"] if p != ".pdf"]
     for key, value in (sc.get("settings") or {}).items():
         if isinstance(value, list):
             value = [ip(v[1:-1]) if isinstance(v, str) and v.startswith("<") else v for v in value]
@@ -107,8 +121,13 @@ def cmd_setup(name: str, start: bool) -> None:
     body = _payload(_call(mcp, "create_project", args))
     project_id = body.get("projectId") or body.get("id") or (body.get("project") or {}).get("id")
     print(f"project {project_id}  auth={sc['auth']}  targets={args['targetIps']}")
+    ui = []
     if sc["auth"] != "none":
-        print(f"set the {sc['auth']} AuthProfile in the UI, then: {sys.argv[0]} start {project_id}")
+        ui.append(f"the {sc['auth']} AuthProfile")
+    if "openapi" in (sc.get("needs") or []):
+        ui.append(f"the OpenAPI source http://{ip('main')}/openapi.json")
+    if ui:
+        print(f"set {' and '.join(ui)} in the UI, then: {sys.argv[0]} start {project_id}")
     elif start:
         cmd_start(project_id, mcp)
 
@@ -179,6 +198,8 @@ def verify(name: str, project_id: str) -> int:
             continue
         if row.get("needs_auth") and not auth:
             continue
+        if row.get("needs") and row["needs"] not in (sc.get("needs") or []):
+            continue
         expected.append(row)
     if not disabled and "roeExcludedHosts" not in (sc.get("settings") or {}) and summary.get("budget_cut", 0) == 0:
         for row in expected:
@@ -191,7 +212,9 @@ def verify(name: str, project_id: str) -> int:
             if problems:
                 failures.append(f"{key}: " + "; ".join(problems))
         expected_keys = {(r["role"], r["path"], r["kind"]) for r in expected}
-        for key in sorted(set(got) - expected_keys):
+        optional = {(r["role"], r["path"], r["kind"]) for r in EXPECTED["v1_findings"]
+                    if r.get("needs") and r["needs"] not in (sc.get("needs") or [])}
+        for key in sorted(set(got) - expected_keys - optional):
             failures.append(f"unexpected {key}")
         for row in EXPECTED["v1_absent"]:
             if row["role"] in sc["roles"] and any(k[0] == row["role"] and k[1] == row["path"] for k in got):
@@ -210,7 +233,7 @@ def verify(name: str, project_id: str) -> int:
             if bad_methods:
                 failures.append(f"{role}: methods {sorted(bad_methods)} in the module window")
             for path in rules["zero_paths"]:
-                if any(h["path"] == path for h in window):
+                if any(h["path"].split("?", 1)[0] == path for h in window):
                     failures.append(f"{role}: {path} was requested")
             for path in rules["never_full_get"]:
                 if any(h["path"] == path and h["method"] == "GET" and not h["range"] for h in window):
@@ -243,6 +266,152 @@ def verify(name: str, project_id: str) -> int:
     return 1 if failures else 0
 
 
+AGENT_DIR = HERE / "reports" / "agent"
+_ID = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _psql(sql: str) -> str:
+    out = subprocess.run(["docker", "exec", "redamon-postgres", "psql", "-U", "redamon", "-d", "redamon",
+                          "-tAc", sql], capture_output=True, text=True, check=True)
+    return out.stdout.strip()
+
+
+def _path(value: str) -> str:
+    rest = value.split("://", 1)[-1]
+    return "/" + rest.split("/", 1)[1] if "/" in rest else "/"
+
+
+def cmd_agent_mark(name: str) -> None:
+    EXPECTED["agent"][name]  # an unknown scenario fails here, before the logs are emptied
+    reset_hits()
+    AGENT_DIR.mkdir(parents=True, exist_ok=True)
+    (AGENT_DIR / f"{name}.window").write_text(str(time.time()))
+    print(f"{name}: hit logs emptied, window open; prompt: {EXPECTED['agent'][name].get('prompt', '-')}")
+
+
+def _session(project_id: str, session_id: str | None) -> str:
+    if session_id:
+        return session_id
+    assert _ID.match(project_id)
+    return _psql(f"select session_id from conversations where project_id = '{project_id}' "
+                 "order by created_at desc limit 1")
+
+
+def _transcript(session_id: str) -> list:
+    assert _ID.match(session_id)
+    raw = _psql("select coalesce(json_agg(m.data order by m.sequence_num), '[]'::json) from chat_messages m "
+                f"join conversations c on c.id = m.conversation_id where c.session_id = '{session_id}'")
+    return json.loads(raw or "[]")
+
+
+def agent_verify(name: str, project_id: str, session_id: str | None = None) -> int:
+    spec = EXPECTED["agent"][name]
+    since = float((AGENT_DIR / f"{name}.window").read_text())
+    session_id = _session(project_id, session_id)
+    report = [f"## {name}", "", f"- prompt: \"{spec.get('prompt', '-')}\"", f"- project: `{project_id}`",
+              f"- session: `{session_id}`"]
+    failures: list = []
+    mcp = _mcp()
+
+    rows = _payload(_call(mcp, "query_graph", {"projectId": project_id, "cypher": (
+        "MATCH (cf:ChainFinding)-[:CONFIRMS]->(v:Vulnerability {source:'route_exposure'}) "
+        f"WHERE cf.chain_id = '{session_id}' "
+        "RETURN v.matched_at AS url, v.exposure_kind AS kind, cf.finding_type AS type, cf.confidence AS conf")}))
+    records = rows.get("rows") or rows.get("records") or rows.get("results") or []
+    edges = [r for r in records if isinstance(r, dict)]
+    confirmed = {}
+    for r in edges:
+        confirmed.setdefault(_path(str(r.get("url") or "")), []).append(r)
+    report.append(f"- CONFIRMS edges from this session: {sorted(confirmed)}")
+    for path in spec.get("confirm") or []:
+        got = confirmed.get(path)
+        if not got:
+            failures.append(f"no CONFIRMS edge on {path}")
+            continue
+        if not any(r.get("type") == "vulnerability_confirmed" and int(r.get("conf") or 0) >= 80 for r in got):
+            failures.append(f"{path}: no vulnerability_confirmed edge at confidence >= 80")
+    for path in spec.get("reject") or []:
+        if path in confirmed:
+            failures.append(f"{path} was confirmed but must be rejected")
+    if spec.get("no_edges") and confirmed:
+        failures.append(f"CONFIRMS edges exist: {sorted(confirmed)}")
+    allowed = set(spec.get("confirm") or []) | set(spec.get("may_confirm") or [])
+    for path in sorted(set(confirmed) - allowed):
+        if not spec.get("no_edges"):
+            failures.append(f"unexpected CONFIRMS edge on {path}")
+    for path, got in confirmed.items():
+        if any(r.get("type") in ("exploit_success", "access_gained", "credential_found") for r in got):
+            failures.append(f"{path}: an exploit-type entry carried the id")
+
+    rules = spec.get("hits") or {}
+    methods = set(rules.get("only_methods") or ["GET", "HEAD", "OPTIONS"])
+    for role in ("main", "twin", "hostile"):
+        window = [h for h in hits(role) if h["t"] >= since]
+        bad = {h["method"] for h in window} - methods
+        if bad:
+            failures.append(f"{role}: methods {sorted(bad)} in the session window")
+        for path in EXPECTED["hit_rules"]["zero_paths"]:
+            if any(h["path"].split("?", 1)[0] == path for h in window):
+                failures.append(f"{role}: {path} was requested")
+        for pattern, want in (rules.get("count") or {}).items():
+            if not role == want.get("role", "main"):
+                continue
+            n = sum(1 for h in window if re.search(pattern, h["path"]) and
+                    (not want.get("method") or h["method"] == want["method"]))
+            report.append(f"- {role} hits matching `{pattern}`{' ' + want['method'] if want.get('method') else ''}: {n}")
+            if "exactly" in want and n != want["exactly"]:
+                failures.append(f"{role}: {n} request(s) matching {pattern}, expected exactly {want['exactly']}")
+            if "max" in want and n > want["max"]:
+                failures.append(f"{role}: {n} request(s) matching {pattern}, at most {want['max']}")
+            if "min" in want and n < want["min"]:
+                failures.append(f"{role}: {n} request(s) matching {pattern}, at least {want['min']}")
+        for path in rules.get("never_full_get") or []:
+            if any(h["path"].split("?", 1)[0] == path and h["method"] == "GET" and not h["range"] for h in window):
+                failures.append(f"{role}: a full GET of {path}")
+        if rules.get("no_credentials") and any(h["auth"] or h["cookie"] or h["api_key"] for h in window):
+            failures.append(f"{role}: a request carried a credential")
+        report.append(f"- {role}: {len(window)} request(s) in the session window")
+    outsider = [h for h in hits("outsider") if h["t"] >= since]
+    # A browser rendering a lab page loads the outsider's widget.js as a
+    # sub-resource; anything else sent there was aimed at it.
+    aimed = [h for h in outsider if h["path"].split("?", 1)[0] != "/widget.js"]
+    if aimed:
+        failures.append(f"the outsider received {len(aimed)} request(s) besides /widget.js")
+    if outsider:
+        report.append(f"- outsider: {len(outsider)} request(s), {len(outsider) - len(aimed)} of them /widget.js")
+    for h in outsider:
+        if h.get("auth") or h.get("cookie") or h.get("api_key"):
+            failures.append(f"the outsider received a credential on {h['path']}")
+
+    leftovers = subprocess.run(["docker", "exec", "redamon-kali", "sh", "-c", "ls /tmp | grep '^rex-' || true"],
+                               capture_output=True, text=True).stdout.split()
+    report.append(f"- kali /tmp rex-* files left: {len(leftovers)}")
+    if leftovers:
+        failures.append(f"{len(leftovers)} rex-* file(s) left in the Kali sandbox's /tmp")
+
+    messages = _transcript(session_id)
+    AGENT_DIR.mkdir(parents=True, exist_ok=True)
+    out = AGENT_DIR / f"{name}.json"
+    out.write_text(json.dumps(messages, indent=1))
+    text = out.read_text()
+    report.append(f"- transcript: {len(messages)} message(s), saved to reports/agent/{name}.json")
+    for needle in spec.get("transcript_has") or []:
+        if needle not in text:
+            failures.append(f"the transcript lacks {needle!r}")
+    for needle in spec.get("transcript_lacks") or []:
+        if needle in text:
+            failures.append(f"the transcript contains {needle!r}")
+    leak = agent_leaks(str(out))
+    report.append(f"- leak scan: {'clean' if leak == 0 else 'LEAK'}")
+    if leak:
+        failures.append("the leak scan matched")
+
+    report.append(f"- result: {'PASS' if not failures else 'FAIL'}")
+    report.extend(f"  - {f}" for f in failures)
+    print("\n".join(report))
+    return 1 if failures else 0
+
+
 def agent_leaks(path: str) -> int:
     text = Path(path).read_text(errors="replace")
     secrets_json = subprocess.run(["docker", "exec", CONTAINER.format("main"), "cat", "/tmp/lab-secrets.json"],
@@ -267,6 +436,10 @@ def main(argv: list) -> int:
         return verify(argv[2], argv[3])
     elif cmd == "reset-hits":
         reset_hits()
+    elif cmd == "agent-mark":
+        cmd_agent_mark(argv[2])
+    elif cmd == "agent-verify":
+        return agent_verify(argv[2], argv[3], argv[4] if len(argv) > 4 else None)
     elif cmd == "agent-leaks":
         return agent_leaks(argv[2])
     else:
