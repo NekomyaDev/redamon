@@ -92,7 +92,7 @@ describe('RouteExposureSection', () => {
 
   test('the alert shows when Access Control is off, and only with the module on', () => {
     renderSection({ routeExposureEnabled: true, ...skills({ access_control: false }) })
-    expect(screen.getByRole('alert').textContent).toMatch(/Half a cycle.*turn on Access Control/)
+    expect(screen.getByRole('alert').textContent).toMatch(/Half a cycle.*turn on Broken Access Control in AI Agent > Agent Skills/)
     cleanup()
     renderSection({ routeExposureEnabled: false, ...skills({ access_control: false }) })
     expect(screen.queryByRole('alert')).toBeNull()

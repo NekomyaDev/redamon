@@ -74,8 +74,8 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: R
 
           {enabled && !skillOn('access_control') && (
             <p className={`${styles.fieldHint} ${styles.fieldHintCaution}`} role="alert">
-              <strong>Half a cycle.</strong> Recon writes leads, but nothing confirms them: turn on Access Control in
-              AI Agent &gt; Attack Skills.
+              <strong>Half a cycle.</strong> Recon writes leads, but nothing confirms them: turn on Broken Access
+              Control in AI Agent &gt; Agent Skills.
             </p>
           )}
           {enabled && (!skillOn('path_traversal') || !skillOn('rce')) && (
