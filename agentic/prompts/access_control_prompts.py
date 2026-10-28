@@ -472,3 +472,83 @@ exactly as it appears in that response body - never a placeholder, a summary, or
 re-typed guess. If the winning request's output was offloaded or truncated, re-
 fetch it and read the literal value before you report or `complete`.
 """
+
+
+# The route-exposure parts load only when the project runs recon's route
+# exposure scan (ROUTE_EXPOSURE_ENABLED); with it off the skill's prompt is
+# byte-identical to the one above. Still no tunables: the limit is a constant.
+from .route_exposure_shared import (  # noqa: E402
+    RECORD_CONTRACT as _RECORD_CONTRACT,
+    SAFETY_RULES as _SAFETY_RULES,
+    VALUES_IN_FILES as _VALUES_IN_FILES,
+    candidate_query as _candidate_query,
+)
+
+ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS = """
+## ROUTE EXPOSURE LEADS (recon found routes that may answer without authentication)
+
+Recon's route exposure scan requested every known route anonymously and logged in,
+and wrote leads (`source='route_exposure'`, `needs_agent_confirmation=true`,
+severity info). Your job: prove or reject each one with a non-destructive pair of
+requests plus the judgement a scanner cannot make (is this public by design?).
+These steps run in the INFORMATIONAL phase with execute_curl and execute_code.
+
+**L0. When this applies.** Run graph_summary, then query_graph for
+`MATCH (v:Vulnerability {source:'route_exposure'}) RETURN count(v)`. If there are
+none, say "the route exposure scan has not run or found nothing" and continue with
+the access-control workflow above. Never reuse a count from an earlier turn.
+
+**L1. Pull the leads (ordered, bounded, paged).**
+""" + _candidate_query(["anonymous_access", "sensitive_data"]) + """
+When TrafficMind is on, read the original request with proxy_brain's read helpers
+instead of re-crawling.
+
+**L2. The pair (every lead), GET only.**
+```
+execute_curl  args: -s -o /tmp/rex-<id>-anon.body -w '%{http_code} %{size_download} %{content_type}' '<url>'
+execute_curl  args: -s -o /tmp/rex-<id>-auth.body -w '%{http_code} %{size_download} %{content_type}' '<url>'
+              use_session: true
+execute_code  (python) read /tmp/rex-<id>-anon.body and /tmp/rex-<id>-auth.body; print ONLY:
+              the status pair, the sizes, sha256[:8] of each body with whitespace collapsed,
+              equal yes/no, the JSON key paths present in both (names only), counts of
+              e-mails / phones, and the count of distinct identifier hashes; then os.remove both
+```
+`use_session=true` is attached server-side for one in-scope URL only; if the tool
+says "Auth headers NOT attached", the comparison is anonymous-only: say so.
+
+**L3. Proof standards, by route class.** Every condition of a row must hold.
+
+| route_class | Proof | Reject when |
+| --- | --- | --- |
+| internal_api, admin_function, debug_management, data_export | the anonymous 2xx returns the SAME protected content as the logged-in GET (equal body hash, or the same sensitive key paths) AND one of: the lead's `expected` holds openapi, siblings_locked, version_locked or vary_auth; sensitive key paths; 3 or more other people's identities | public by design (health, status, version, docs, public catalogue, marketing JSON, login, help), or nothing sensitive in the anonymous answer |
+| old_version | the pair on the variant AND on its `variant_of`: the newer route denies anonymously, the older one returns the same resource | the old version returns only public data |
+| uploaded_content | an anonymous GET (or HEAD, or `Range: bytes=0-0` for a large file) returns a file a logged-in page links to | the file is a public asset |
+| kind sensitive_data (any class) | the logged-in body carries sensitive key paths, OR 3 or more records whose identifier hashes differ from the session's own (hash the identifier fields of a /me-style route the same way and print only the hash prefix) | only the session's own record and no sensitive key path |
+
+**L4. UI-vs-API diff** (EXPLOITATION phase only, excessive data). proxy_brain's
+browser renders, logged in, the page that calls the API; a script compares the
+API's key paths with the labels and values present in the rendered text, by hash.
+Keys returned but never rendered are the evidence. The browser sends the session to
+the pinned host only.
+
+**L5. Record, then verify.** As below. Record each proven lead in the response that
+read its proof.
+
+**L6. Hand the artifacts to their skill.** Count the signature findings not yet
+confirmed:
+```cypher
+MATCH (v:Vulnerability {source:'route_exposure'})
+WHERE v.needs_agent_confirmation = false AND NOT (:ChainFinding)-[:CONFIRMS]->(v)
+RETURN v.exposure_kind AS kind, count(*) AS n ORDER BY n DESC
+```
+Name the counts in your final answer. If vcs_exposure, env_file, config_file,
+backup_file or secret_in_response exist and the path_traversal skill is enabled, end
+with `action='switch_skill'`, `skill_switch: {to_skill: 'path_traversal', reason}`. If
+debug_console or debug_endpoint exist and rce is enabled, switch to `rce`. If both
+apply, take the larger group first and name the other in the reason. A disabled
+skill: say the finding stands on its signature.
+
+**L7. Admin panels.** Once an admin_function route is confirmed, name the product if
+you recognise it. If brute_force_credential_guess is enabled and the RoE does not
+forbid brute force, propose it in your final answer. Never try a password here.
+""" + _VALUES_IN_FILES + _RECORD_CONTRACT + _SAFETY_RULES

@@ -109,6 +109,13 @@ _SPECS = (
      PLAIN, (), "PATH_TRAVERSAL_ARCHIVE_EXTRACTION_ENABLED and execute_code allowed"),
     ("path_traversal", "payload_reference", "path_traversal_prompts.PATH_TRAVERSAL_PAYLOAD_REFERENCE",
      PLAIN, (), "PATH_TRAVERSAL_PAYLOAD_REFERENCE_ENABLED"),
+    ("path_traversal", "exposed_files", "path_traversal_prompts.PATH_TRAVERSAL_EXPOSED_FILES", TEMPLATE,
+     ("git_reconstruct", "validate_secrets"), "ROUTE_EXPOSURE_ENABLED"),
+    ("path_traversal", "git_reconstruct", "path_traversal_prompts.PATH_TRAVERSAL_GIT_RECONSTRUCT", PLAIN, (),
+     "ROUTE_EXPOSURE_ENABLED, PATH_TRAVERSAL_GIT_RECONSTRUCT_ENABLED, ROE_ALLOW_DATA_EXFILTRATION and "
+     "execute_code allowed"),
+    ("path_traversal", "validate_secrets", "path_traversal_prompts.PATH_TRAVERSAL_VALIDATE_SECRETS", PLAIN, (),
+     "ROUTE_EXPOSURE_ENABLED, PATH_TRAVERSAL_VALIDATE_SECRETS_ENABLED and execute_code allowed"),
 
     ("deserialization", "tools", "deserialization_prompts.DESERIALIZATION_TOOLS", TEMPLATE,
      ("deser_exec_gadgets_enabled", "deser_find_sinks_enabled", "deser_oob_callback_enabled",
@@ -132,6 +139,11 @@ _SPECS = (
     ("rce", "deserialization_workflow", "rce_prompts.RCE_DESERIALIZATION_WORKFLOW", PLAIN, (),
      "RCE_DESERIALIZATION_ENABLED"),
     ("rce", "payload_reference", "rce_prompts.RCE_PAYLOAD_REFERENCE", PLAIN, (), _ALWAYS),
+    ("rce", "route_exposure_consoles", "rce_prompts.RCE_ROUTE_EXPOSURE_CONSOLES", TEMPLATE,
+     ("heapdump_analysis",), "ROUTE_EXPOSURE_ENABLED"),
+    ("rce", "heapdump_analysis", "rce_prompts.RCE_HEAPDUMP_ANALYSIS", PLAIN, (),
+     "ROUTE_EXPOSURE_ENABLED, RCE_HEAPDUMP_ANALYSIS_ENABLED, ROE_ALLOW_DATA_EXFILTRATION, "
+     "ROE_SENSITIVE_DATA_HANDLING above no_access and execute_code allowed"),
 
     ("cve_exploit", "tools", "cve_exploit_prompts.CVE_EXPLOIT_TOOLS", PLAIN, (), _ALWAYS),
     ("cve_exploit", "payload_guidance_statefull", "cve_exploit_prompts.CVE_PAYLOAD_GUIDANCE_STATEFULL",
@@ -144,6 +156,8 @@ _SPECS = (
      PLAIN, (), "stateless mode and a Metasploit search returned no module"),
 
     ("access_control", "tools", "access_control_prompts.ACCESS_CONTROL_TOOLS", PLAIN, (), _ALWAYS),
+    ("access_control", "route_exposure_leads", "access_control_prompts.ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS",
+     PLAIN, (), "ROUTE_EXPOSURE_ENABLED"),
 
     ("http_request_smuggling", "tools", "http_smuggling_prompts.HTTP_SMUGGLING_TOOLS", PLAIN, (), _ALWAYS),
     ("http_request_smuggling", "zero_cl_step", "http_smuggling_prompts.HTTP_SMUGGLING_ZERO_CL_STEP",
