@@ -643,7 +643,7 @@ The recon pipeline uses a **fan-out / fan-in** pattern with Python's `concurrent
 | **GROUP 5** | Resource Enum (Katana + GAU + Kiterunner, then OpenAPI) | 3 tools internally parallel | Needs live URLs from GROUP 4 |
 | **GROUP 5b** | JS Recon Scanner (100 regex patterns, key validation, source maps, dependency confusion, endpoint extraction, DOM sinks) | 5 analyzers parallel per file | Needs JS files from GROUP 5; runs if `JS_RECON_ENABLED` |
 | **GROUP 5.5** | Supply-Chain Recon (black-box package harvest + offline OSV verdict, retire.js over served JS, optional GuardDog; then incident enrichment, malicious-host correlation and typosquat detection) | Sequential; dispatches the DIRTY analyzer | Needs JS files from GROUP 5b; runs if `SUPPLY_CHAIN_RECON_ENABLED` |
-| **GROUP 6 Phase A** | Vuln Scan (Nuclei) ∥ GraphQL Security Testing ∥ Subdomain Takeover ∥ VHost & SNI Enumeration | 4 parallel tasks (ThreadPoolExecutor, `_isolated` wrappers) | Needs endpoints from GROUP 5/5b |
+| **GROUP 6 Phase A** | Vuln Scan (Nuclei) ∥ GraphQL Security Testing ∥ Subdomain Takeover ∥ VHost & SNI Enumeration ∥ Web Cache Poisoning ∥ Origin Discovery ∥ Route Exposure | Up to 7 parallel tasks (ThreadPoolExecutor, `_isolated` wrappers), each only when enabled | Needs endpoints from GROUP 5/5b |
 | **GROUP 6 Phase B** | MITRE Enrichment (CWE + CAPEC) | Sequential | Needs CVEs from Phase A (Nuclei) |
 
 ### IP attribution
@@ -1729,6 +1729,30 @@ graph_db/mixins/recon/vhost_sni_mixin.py     # Neo4jClient.update_graph_from_vho
 
 ---
 
+### Module 5e: `route_exposure`
+
+Requests the routes recon found, and routes it generates, without credentials, and again
+logged in where the project's authentication profile covers the host. Runs in GROUP 6
+Phase A beside Nuclei and the other active scanners, after resource_enum and JS Recon have
+landed. Toggle: `ROUTE_EXPOSURE_ENABLED` (default `false`). Code: `recon/route_exposure/`.
+
+| Stage | What it does |
+| --- | --- |
+| Harvest | One route per (base URL, path, GET) from resource_enum (with its OpenAPI security, tags and declared-only flag and a discovery tool's 401/403), JS Recon's endpoints and http_probe's pages. Templated, static, auth-flow and state-changing paths (`logout`, `delete`, `reset`, ... as whole tokens) are never kept; a POST-only route is skipped. |
+| Generate | Seed paths (internal, admin and debug, 60 per host), `.git`/`.svn`/`.hg`/`.env`/`web.config` at each base and top-level folder (30), backup variants of server-side files plus root archives and dumps (40, read with HEAD then `Range: bytes=0-1023`), older API versions (3 per route). Each has its own setting. |
+| Rank | A deterministic prior score whose reasons are the `auth_expected_by` hints; the floor (score 5 or more, every VCS/env guess) goes first; per-host and total budgets, hosts round-robin. |
+| Probe | One process-wide locked pacer (`ROUTE_EXPOSURE_MAX_RPS`, under the RoE ceiling), per-worker sessions that keep no cookie, `verify=False` with the TLS warning silenced, bodies capped at 256 KiB, no redirect followed, the host breaker, the stop flag, capture routing (logged-in requests only for bearer, basic and cookie profiles). One guard for every request and control: the run's own hosts follow the pipeline's address rule, a host seen only in a bundle must pass the probe scope and the attacker-URL rule. |
+| Assess | Signatures first (a debug page answers 500), then the logged-in GET whatever the anonymous answer was, then the drops (denied, empty, catch-all by a control request sent exactly like the hit, login wall by the page-type prefilter) and the content signals (PII kinds and one count, sensitive key names, secret detector names). A second pass adds `siblings_locked` (same content kind as the locked neighbours), `version_locked` and `vary_auth`. |
+
+Output: `combined_result["route_exposure"]` (summary, findings, endpoint_status,
+new_endpoints) and, through `update_graph_from_route_exposure`, `Endpoint.anon_status`,
+new Endpoints for generated routes that answered with content (never an artifact) and one
+`:Vulnerability {source:'route_exposure'}` per finding: leads with
+`needs_agent_confirmation` at severity info, findings with their signature's severity. A
+failure is noted degraded so the prune keeps last run's findings. Logs are counts only.
+
+---
+
 ### Module 6: `github`
 
 ```mermaid
@@ -2033,6 +2057,7 @@ recon/
 ├── graphql_scan/             # GraphQL probe
 ├── cache_scan/               # Web cache poisoning probe
 ├── serialized_scan/          # Serialized-object probe
+├── route_exposure/           # Route exposure scan (anonymous vs logged-in routes, exposed files)
 ├── data/                     # Static data (IANA services, popular npm names)
 ├── wordlists/                # vhost wordlist
 ├── tests/                    # pytest suite (runs in the redamon-recon image)

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Route exposure scan** (recon, GROUP 6 Phase A, off by default). It requests the routes recon found, plus internal, admin and debug paths, `.git`/`.env`/`web.config` files, backup copies and older API versions, anonymously and, where the authentication profile covers the host, logged in. It writes leads for the agent (a route open without credentials where authentication was expected, or a response carrying sensitive fields or other people's personal data) and findings a signature proves (exposed version control, env, config and backup files, debug consoles and endpoints, debug pages, route catalogs, secrets). GET and HEAD only, never a state-changing path, personal data stored as kinds and a count. Leads stay out of reports until the agent confirms them; findings are classed and grouped on the Priority Board; a Route Exposure tab joins the Red Zone; partial recon supports it.
+  - **Upgrade.** `docker compose exec webapp npx prisma db push`, rebuild `agent` and `webapp`, restart `recon-orchestrator`.
+
 ## [7.4.0] - 2026-10-27
 
 Fewer false positives, honest coverage, and scans that stop, pause and resume as they should.
