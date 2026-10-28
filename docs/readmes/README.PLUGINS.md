@@ -1082,7 +1082,7 @@ agent follows. It is defined precisely:
   allowed in the current phase, and the Rules of Engagement
   ([`build_builtin_skill_workflow`](../../agentic/prompts/__init__.py#L174)). An override
   therefore targets **one part**: `targetKey = <skillId>/<partId>`. The agent publishes the
-  list of parts that can be overridden (`GET /plugins/skill-parts`, master key; 47 parts across
+  list of parts that can be overridden (`GET /plugins/skill-parts`, master key; 53 parts across
   the 14 built-in skills, registered in [skill_parts.py](../../agentic/prompts/skill_parts.py)).
   Each entry gives the part's kind (**template** or **plain text**), its placeholder names and
   the SHA-256 of its factory text.
