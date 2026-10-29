@@ -226,3 +226,68 @@ agent:
     # names only; the leak scan proves no value came with them.
     transcript_has: ["password_hash", "reset_token"]
     hits: {only_methods: [GET, HEAD, OPTIONS], outsider_widget: true}
+  AG12:
+    # REQUIRE_TOOL_CONFIRMATION on: every gated tool (DANGEROUS_TOOLS) runs only after an
+    # approval click; the operator denies the first execute_curl, and that call is never
+    # sent again with the same arguments.
+    prompt: "Confirm the route exposure leads recon found"
+    may_confirm: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+                  /api/users/me, /uploads/invoice-1001.pdf,
+                  /xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
+    reject: [/api/admin/help]
+    tool_confirmation: true
+    hits: {only_methods: [GET, HEAD, OPTIONS]}
+  # AG13: each prompt routes to its skill when the skill is on, and never to it when off.
+  # Routing is decided at the first turn, so a session may be stopped once classified.
+  AG13-ac-on:
+    prompt: "Check the unauthenticated internal routes recon found"
+    route: access_control
+    may_confirm: &ag13_any [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+                  /api/users/me, /uploads/invoice-1001.pdf,
+                  /xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
+    hits: {only_methods: [GET, HEAD, OPTIONS]}
+  AG13-ac-off:
+    prompt: "Check the unauthenticated internal routes recon found"
+    route_not: access_control
+    # With access_control off, no lead may be confirmed (AG3's rule).
+    reject: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+             /api/users/me, /uploads/invoice-1001.pdf, /api/admin/help]
+    may_confirm: [/xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
+    hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
+  AG13-pt-on:
+    prompt: "Prove the exposed .git recon found"
+    route: path_traversal
+    may_confirm: *ag13_any
+    hits: {only_methods: [GET, HEAD]}
+  AG13-pt-off:
+    prompt: "Prove the exposed .git recon found"
+    route_not: path_traversal
+    may_confirm: *ag13_any
+    hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
+  AG13-rce-on:
+    prompt: "Check the debug console recon found"
+    route: rce
+    may_confirm: *ag13_any
+    hits:
+      only_methods: [GET, HEAD]
+      count:
+        '^/console\?.*__debugger__': {max: 0}
+  AG13-rce-off:
+    prompt: "Check the debug console recon found"
+    route_not: rce
+    may_confirm: *ag13_any
+    hits:
+      only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
+      count:
+        '^/console\?.*__debugger__': {max: 0}
+  AG15:
+    # Regression on a project that never had the module: an ordinary access-control
+    # session, and no route exposure text anywhere in its transcript.
+    prompt: "Check whether the order API at http://172.28.0.93/api/v2/orders/42 enforces authentication"
+    route: access_control
+    no_edges: true
+    transcript_lacks: ["route_exposure", "Route exposure", "ROUTE EXPOSURE", "recon's route-exposure"]
+    hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}

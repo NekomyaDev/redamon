@@ -343,6 +343,72 @@ def _transcript(session_id: str) -> list:
     return json.loads(raw or "[]")
 
 
+def _typed_messages(session_id: str) -> list:
+    assert _ID.match(session_id)
+    raw = _psql("select coalesce(json_agg(json_build_object('type', m.type, 'data', m.data) "
+                "order by m.sequence_num), '[]'::json) from chat_messages m join conversations c "
+                f"on c.id = m.conversation_id where c.session_id = '{session_id}'")
+    return json.loads(raw or "[]")
+
+
+def _dangerous_tools() -> set:
+    # Read from the agent's own settings module, so the gate the agent applies and
+    # the one checked here never drift apart.
+    import ast
+    src = (REPO / "agentic" / "project_settings.py").read_text()
+    node = ast.parse(src)
+    for stmt in node.body:
+        if isinstance(stmt, ast.Assign) and any(getattr(t, "id", "") == "DANGEROUS_TOOLS" for t in stmt.targets):
+            return set(ast.literal_eval(stmt.value.args[0]))
+    raise RuntimeError("DANGEROUS_TOOLS not found")
+
+
+def _check_tool_confirmation(session_id: str, report: list, failures: list) -> None:
+    """Every gated tool ran only after its approval, at least one call was denied,
+    and a denied call was never sent afterwards with the same arguments."""
+    dangerous = _dangerous_tools()
+    approved: list = []
+    pending: list = []
+    denied: list = []
+    started = requests = 0
+    for m in _typed_messages(session_id):
+        kind, data = m["type"], m["data"] or {}
+        if kind == "tool_confirmation_request":
+            requests += 1
+            pending = [(t.get("tool_name"), json.dumps(t.get("tool_args") or {}, sort_keys=True))
+                       for t in data.get("tools") or []]
+        elif kind == "tool_confirmation_response":
+            decision = str(data.get("decision") or "")
+            if decision in ("approve", "modify"):
+                approved.extend(name for name, _ in pending)
+            else:
+                denied.extend(pending)
+            pending = []
+        elif kind == "tool_start" and data.get("tool_name") in dangerous:
+            started += 1
+            name = data["tool_name"]
+            if name in approved:
+                approved.remove(name)
+            else:
+                failures.append(f"{name} ran without an approval")
+            args = json.dumps(data.get("tool_args") or {}, sort_keys=True)
+            if (name, args) in denied:
+                failures.append(f"a denied {name} call was sent again")
+    report.append(f"- tool confirmations: {requests} request(s), {started} gated tool run(s), "
+                  f"{len(denied)} denied call(s)")
+    if not requests:
+        failures.append("no tool confirmation was requested")
+    if not denied:
+        failures.append("no tool call was denied (the scenario denies one execute_curl)")
+
+
+def _first_route(messages: list) -> str:
+    for m in messages:
+        if isinstance(m, dict) and m.get("attack_path_type"):
+            return str(m["attack_path_type"])
+    return ""
+
+
 def agent_verify(name: str, project_id: str, session_id: str | None = None) -> int:
     spec = EXPECTED["agent"][name]
     since = float((AGENT_DIR / f"{name}.window").read_text())
@@ -471,6 +537,15 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
     for needle in spec.get("transcript_lacks") or []:
         if needle in text:
             failures.append(f"the transcript contains {needle!r}")
+    if "route" in spec or "route_not" in spec:
+        route = _first_route(messages)
+        report.append(f"- classified: {route or '-'}")
+        if "route" in spec and route != spec["route"]:
+            failures.append(f"classified {route or 'nothing'}, expected {spec['route']}")
+        if "route_not" in spec and route == spec["route_not"]:
+            failures.append(f"classified {route}, which is turned off")
+    if spec.get("tool_confirmation"):
+        _check_tool_confirmation(session_id, report, failures)
     leak = agent_leaks(str(out))
     report.append(f"- leak scan: {'clean' if leak == 0 else 'LEAK'}")
     if leak:
