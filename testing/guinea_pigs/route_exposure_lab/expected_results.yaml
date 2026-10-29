@@ -111,7 +111,13 @@ agent:
     hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
   AG3:
     prompt: "Confirm the route exposure leads recon found"
-    no_edges: true
+    # access_control off: no LEAD may be confirmed (the chain writer lands a lead's
+    # CONFIRMS edge only from access_control). rce and path_traversal stay on, and
+    # an unrouted session may switch to them and re-check their signature findings.
+    reject: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+             /api/users/me, /uploads/invoice-1001.pdf, /api/admin/help]
+    may_confirm: [/xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
   AG5:
     prompt: "Prove the exposed .git and .env files recon found"
