@@ -298,3 +298,11 @@ def test_the_console_evaluation_is_the_bare_expression_and_a_400_ends_it():
     assert "?__debugger__=yes&cmd=1%2B1&frm=<frm>&s=<SECRET>" in flat
     assert "`cmd` is the bare expression `1+1`, never `print(1+1)` or any other wrapper" in flat
     assert "a 400 ends the proof, it never means the request shape needs another try" in flat
+
+
+def test_the_console_secret_is_the_script_variable_and_never_guessed():
+    # A live AG8b looked for SECRET in form inputs, found none, and sent without it.
+    flat = " ".join(_new_parts()["consoles"].split())
+    assert 'the page\'s `SECRET = "..."` script variable (beside `EVALEX`, not a form field)' in flat
+    assert "`frm` is `0` on the standalone console" in flat
+    assert "never prints it, and sends nothing when it is missing" in flat
