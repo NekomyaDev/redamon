@@ -55,6 +55,10 @@ so a body must never be a tool's output. Every recipe here:
    prefixes. Never a value, record, secret, token or cookie.
 3. deletes it in that same script (os.remove) and prints nothing else from it.
 
+Before `switch_skill`, `transition_phase` or `complete`, the execute_code you run
+also removes every `/tmp/rex-*` file still there (glob, os.remove) and prints only
+how many it removed: a body left behind is a value left on disk.
+
 With `use_session=true` the flags `-v`, `-i`, `--trace`, `-D -` and `-o -` are
 FORBIDDEN: they would echo the session's headers, a Set-Cookie or the body.
 """

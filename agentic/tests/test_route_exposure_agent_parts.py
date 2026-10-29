@@ -151,6 +151,21 @@ def test_main_parts_carry_the_contract(name):
     assert "`-v`, `-i`, `--trace`, `-D -` and `-o -` are" in text
 
 
+def test_a_declared_login_is_proof_without_sensitive_content():
+    row = next(line for line in _new_parts()["leads"].splitlines() if line.startswith("| internal_api"))
+    proof, reject = row.split(" | ")[1], row.split(" | ")[2]
+    # A live run rejected an OpenAPI-locked export for "nothing sensitive": the
+    # API's own declaration (or locked siblings) is the proof; the sensitivity
+    # rejection holds only for a lead with none of those signals.
+    assert "the content need not be sensitive" in proof
+    assert reject.startswith("none of (a)")
+
+
+def test_bodies_left_behind_are_removed_before_leaving_the_skill():
+    for name in ("leads", "exposed_files", "consoles"):
+        assert "removes every `/tmp/rex-*` file still there" in _new_parts()[name]
+
+
 def test_an_uploaded_file_is_proven_by_a_link_only_the_session_sees():
     row = next(line for line in _new_parts()["leads"].splitlines() if line.startswith("| uploaded_content"))
     # "A logged-in page links to it" is a check the agent runs, not a judgement:
