@@ -7,6 +7,7 @@ import { type ProjectRoots, admitsPartialHost } from '@/lib/partialReconScope'
 import { type ScopeGroup, groupLabel } from '@/lib/scopeGroups'
 import { isValidDomain } from '@/lib/validation'
 import { announceProjectWrite } from '@/lib/projectVersion'
+import { errorMessage, fetchJson, formatApiError, readApiError, toApiError } from '@/lib/apiError'
 import type { GraphInputs, PartialReconParams, UserTargets } from '@/lib/recon-types'
 import { useOpenApiSourceLabels } from '@/hooks/useOpenApiSourceLabels'
 import { publicDocumentUrl, type OpenApiSourceRow } from '@/lib/openapiSourceStatus'
@@ -424,6 +425,8 @@ export function PartialReconModal({
   // The saved project's scope groups: what the orchestrator judges typed input by.
   const [scopeGroups, setScopeGroups] = useState<ScopeGroup[] | null>(null)
   const [loadingInputs, setLoadingInputs] = useState(false)
+  // Set when the graph could not be read: the counts are then unknown, not zero.
+  const [graphReadError, setGraphReadError] = useState<string | null>(null)
   const [userSettings, setUserSettings] = useState<Record<string, string> | null>(null)
   const [customSubdomains, setCustomSubdomains] = useState('')
   const [customIps, setCustomIps] = useState('')
@@ -485,14 +488,20 @@ export function PartialReconModal({
       .then(res => (res.ok ? res.json() : null))
       .then(project => setScopeGroups(Array.isArray(project?.scopeGroups) ? project.scopeGroups : null))
       .catch(() => setScopeGroups(null))
-    fetch(`/api/recon/${projectId}/graph-inputs/${toolId}`)
-      .then(res => res.ok ? res.json() : null)
-      .then((data: GraphInputs | null) => {
+    setGraphReadError(null)
+    fetchJson<(GraphInputs & { degraded?: string; code?: string }) | null>(
+      `/api/recon/${projectId}/graph-inputs/${toolId}`, undefined, 'Could not read the graph',
+    )
+      .then((data) => {
         setGraphInputs(data || fallback)
+        if (data?.degraded === 'graph_unavailable') {
+          setGraphReadError(formatApiError({ reason: 'Could not read the graph', code: data.code, status: 0 }))
+        }
         setLoadingInputs(false)
       })
-      .catch(() => {
+      .catch((err) => {
         setGraphInputs(fallback)
+        setGraphReadError(errorMessage(err, 'Could not read the graph'))
         setLoadingInputs(false)
       })
     // Fetch existing uploaded JS files for JsRecon
@@ -523,8 +532,7 @@ export function PartialReconModal({
       formData.append('file', file)
       const res = await fetch(`/api/js-recon/${projectId}/upload`, { method: 'POST', body: formData })
       if (!res.ok) {
-        const data = await res.json()
-        setUploadError(data.error || 'Upload failed')
+        setUploadError((await readApiError(res, 'Upload failed')).message)
         return
       }
       announceProjectWrite(projectId, (await res.json()).projectUpdatedAt)
@@ -533,8 +541,8 @@ export function PartialReconModal({
         const data = await listRes.json()
         setUploadedJsFiles(data.files || [])
       }
-    } catch {
-      setUploadError('Upload failed')
+    } catch (err) {
+      setUploadError(toApiError(err, 'Upload failed').message)
     } finally {
       setIsUploading(false)
       if (jsFileInputRef.current) jsFileInputRef.current.value = ''
@@ -543,15 +551,19 @@ export function PartialReconModal({
 
   const handleJsFileDelete = useCallback(async (filename: string) => {
     if (!projectId) return
+    setUploadError(null)
     try {
       const res = await fetch(`/api/js-recon/${projectId}/upload?name=${encodeURIComponent(filename)}`, { method: 'DELETE' })
       if (res.ok) announceProjectWrite(projectId, (await res.json()).projectUpdatedAt)
+      else setUploadError((await readApiError(res, 'Could not delete the file')).message)
       const listRes = await fetch(`/api/js-recon/${projectId}/upload`)
       if (listRes.ok) {
         const data = await listRes.json()
         setUploadedJsFiles(data.files || [])
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      setUploadError(toApiError(err, 'Could not delete the file').message)
+    }
   }, [projectId])
 
   // The roots this run covers. A route that predates multi-root runs sent only `domain`.
@@ -924,6 +936,11 @@ export function PartialReconModal({
             partial recon is off until then.
           </div>
         )}
+        {!loadingInputs && graphReadError && (
+          <div style={legacyGraphStyle} role="alert" data-testid="partial-recon-graph-unreadable">
+            {graphReadError}. The graph counts below are unknown, not zero.
+          </div>
+        )}
         {!loadingInputs && staleDomains.length > 0 && (
           <div style={noteStyle} data-testid="partial-recon-stale">
             <strong>{staleDomains.join(', ')}</strong>: no longer a scan root of this project, not scanned; the next full recon removes {staleDomains.length === 1 ? 'it' : 'them'}.
@@ -990,7 +1007,7 @@ export function PartialReconModal({
         )}
 
         {/* No targets warning */}
-        {hasNoGraphTargets && includeGraphTargets && hasNoCustomTargets && (
+        {hasNoGraphTargets && includeGraphTargets && hasNoCustomTargets && !graphReadError && (
           <div style={{
             fontSize: '11px', color: '#facc15', lineHeight: '1.5', padding: '8px 12px', borderRadius: '6px',
             backgroundColor: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.2)',
