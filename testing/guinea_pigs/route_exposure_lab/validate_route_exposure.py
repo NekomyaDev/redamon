@@ -8,6 +8,8 @@
     python3 validate_route_exposure.py agent-mark AG1         # just before the prompt is sent
     python3 validate_route_exposure.py agent-verify AG1 <projectId> [sessionId]
     python3 validate_route_exposure.py agent-leaks <transcript.json>
+    python3 validate_route_exposure.py agent-check-ag14 <projectId>   # after a triage run, with
+        # the browser's Red Zone and Insights fetches saved as reports/agent/AG14_*.json
 
 Reads MCP_SERVER_TOKEN from the repo .env (through mcp_client) and never prints
 it. The AuthProfile cannot be set over MCP: set it in the UI between `setup`
@@ -566,6 +568,120 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
     return 1 if failures else 0
 
 
+def _saved_fetch(name: str) -> dict:
+    """A browser fetch saved by evaluate_script (a JSON object, maybe after a header line)."""
+    raw = (AGENT_DIR / name).read_text()
+    return json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
+
+
+def _lead_path(name: str) -> str:
+    return name.rsplit(": ", 1)[-1] if ": " in name else ""
+
+
+def agent_check_ag14(project_id: str) -> int:
+    """AG14 (checks only, after AG1, AG5, AG8): a confirmed lead is T1 and reportable,
+    counted by the report predicate and shown confirmed in the Red Zone; the rejected
+    lead stays T4 info, uncounted and pending. Reads the Red Zone and Insights fetches
+    the logged-in browser saved to reports/agent/AG14_redzone.json and AG14_insights.json
+    (Insights runs the report's own predicate: notMuted, reportCountable and
+    agentCandidateConfirmedOrNA), then grades the board with triage_eval.py."""
+    assert _ID.match(project_id)
+    spec = EXPECTED["agent"]["AG1"]
+    mcp = _mcp()
+    report = ["## AG14", "", f"- project: `{project_id}`"]
+    failures: list = []
+    rows = _payload(_call(mcp, "query_graph", {"projectId": project_id, "cypher": (
+        "MATCH (cf:ChainFinding)-[:CONFIRMS]->(v:Vulnerability {source:'route_exposure'}) "
+        "WHERE v.needs_agent_confirmation = true AND cf.finding_type = 'vulnerability_confirmed' "
+        "AND cf.confidence >= 80 RETURN DISTINCT v.matched_at AS url")}))
+    confirmed = {_path(str(r.get("url") or "")) for r in (rows.get("rows") or rows.get("records") or [])
+                 if isinstance(r, dict)}
+    report.append(f"- leads confirmed (any session): {sorted(confirmed)}")
+    for path in spec["confirm"]:
+        if path not in confirmed:
+            failures.append(f"{path}: AG1's lead has no vulnerability_confirmed edge")
+    board: dict = {}
+    offset = 0
+    while True:
+        page = _payload(_call(mcp, "list_findings", {"projectId": project_id, "limit": 100, "offset": offset}))
+        items = page.get("findings") or []
+        for f in items:
+            if f.get("source") == "route_exposure":
+                board.setdefault(_lead_path(str(f.get("name") or "")), []).append(f)
+        offset += len(items)
+        if not items or offset >= int(page.get("total") or 0):
+            break
+    lead_names = ("Route answers without authentication", "Response exposes sensitive data")
+    for path in sorted(confirmed):
+        for f in board.get(path, []):
+            if str(f.get("name", "")).startswith(lead_names):
+                ok = f.get("triage_tier") == "T1" and f.get("disposition") == "reportable"
+                report.append(f"- board {path}: {f.get('triage_tier')} {f.get('disposition')}")
+                if not ok:
+                    failures.append(f"{path}: confirmed but {f.get('triage_tier')} {f.get('disposition')}")
+    for path in spec["reject"]:
+        for f in board.get(path, []):
+            report.append(f"- board {path}: {f.get('triage_tier')} {f.get('disposition')} {f.get('severity')}")
+            if (f.get("triage_tier"), f.get("severity")) != ("T4", "info") or f.get("disposition") == "reportable":
+                failures.append(f"{path}: rejected but {f.get('triage_tier')} {f.get('disposition')}")
+        if path in confirmed:
+            failures.append(f"{path}: rejected lead has a CONFIRMS edge")
+
+    zone = {(r["path"], r["kind"]): r["status"] for r in _saved_fetch("AG14_redzone.json")["data"]["rows"]}
+    for (path, kind), status in sorted(zone.items()):
+        if kind not in ("anonymous_access", "sensitive_data"):
+            continue
+        want = "confirmed" if path in confirmed else "pending"
+        if status != want:
+            failures.append(f"Red Zone {path} {kind}: {status}, expected {want}")
+    report.append(f"- Red Zone leads: {sum(1 for (p, k), s in zone.items() if s == 'confirmed')} confirmed, "
+                  f"{sum(1 for (p, k), s in zone.items() if s == 'pending')} pending")
+
+    counted = {_lead_path(str(v.get("name") or "")) for v in _saved_fetch("AG14_insights.json")["data"]["vulnTypes"]
+               if v.get("source") == "route_exposure" and str(v.get("name", "")).startswith(lead_names)}
+    report.append(f"- counted by the report predicate (Insights): {sorted(counted)}")
+    for path in sorted(confirmed):
+        if path not in counted:
+            failures.append(f"{path}: confirmed but left out by the report predicate")
+    for path in sorted(set(zone_p for (zone_p, _), s in zone.items() if s == "pending")):
+        if path in counted and path not in confirmed:
+            failures.append(f"{path}: pending but counted by the report predicate")
+
+    env = dict(os.environ)
+    for line in (REPO / ".env").read_text().splitlines():
+        if line.startswith(("NEO4J_PASSWORD=", "NEO4J_USER=")):
+            key, _, value = line.partition("=")
+            env[key] = value.strip().strip('"').strip("'")
+    env.setdefault("NEO4J_USER", "neo4j")
+    uid = _psql(f"select user_id from projects where id = '{project_id}'")
+    run = subprocess.run(
+        ["docker", "run", "--rm", "--network", "redamon-network", "-v", f"{REPO}:/repo", "-w", "/repo",
+         "--user", f"{os.getuid()}:{os.getgid()}", "-e", "PYTHONPATH=/repo", "-e", "HOME=/tmp",
+         "-e", "NEO4J_URI=bolt://redamon-neo4j:7687", "-e", "NEO4J_USER", "-e", "NEO4J_PASSWORD",
+         "--entrypoint", "python", "redamon-agent:latest", "tooling/scripts/triage_eval.py",
+         "--guinea-pig", "route_exposure_lab", "--user", uid, "--project", project_id],
+        capture_output=True, text=True, env=env)
+    out = run.stdout
+    if run.returncode:
+        # The last line names the exception type; the graph password never reaches it.
+        failures.append(f"triage_eval.py exited {run.returncode}: {(run.stderr.strip().splitlines() or [''])[-1][:120]}")
+    ranks =[ln.strip() for ln in out.splitlines() if re.match(r"\s*#\d+\s", ln)]
+    report.append("- triage_eval.py (board order):")
+    report.extend(f"  - `{ln}`" for ln in ranks)
+    report.extend(f"  - {ln.strip()}" for ln in out.splitlines() if "NDCG" in ln)
+    for ln in ranks:
+        path = _lead_path(ln)
+        if path in confirmed and " T1 " not in f" {ln} ":
+            failures.append(f"triage_eval: {path} is confirmed but not T1")
+    if not ranks:
+        failures.append("triage_eval.py printed no ranking")
+
+    report.append(f"- result: {'PASS' if not failures else 'FAIL'}")
+    report.extend(f"  - {f}" for f in failures)
+    print("\n".join(report))
+    return 1 if failures else 0
+
+
 def agent_leaks(path: str) -> int:
     text = Path(path).read_text(errors="replace")
     secrets_json = subprocess.run(["docker", "exec", CONTAINER.format("main"), "cat", "/tmp/lab-secrets.json"],
@@ -596,6 +712,8 @@ def main(argv: list) -> int:
         return agent_verify(argv[2], argv[3], argv[4] if len(argv) > 4 else None)
     elif cmd == "agent-leaks":
         return agent_leaks(argv[2])
+    elif cmd == "agent-check-ag14":
+        return agent_check_ag14(argv[2])
     else:
         print(__doc__)
         return 2
