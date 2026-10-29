@@ -244,6 +244,11 @@ def test_an_anonymous_replay_uses_proxy_brain_and_prints_no_body():
     assert "`redamon.replay(<txn id>, anonymous=True)`" in text
     assert "`<Response <status> <length>b anonymous>`" in text
     assert "never `.body`" in text
+    # A live AG10's replay was refused in the informational phase and it fell back
+    # to the curl pair, whose logged-in side carried the profile's header.
+    flat = " ".join(text.split())
+    assert "A replay is an EXPLOITATION-phase request" in flat
+    assert "send only that anonymous side: no logged-in request goes with it" in flat
 
 
 def test_the_ui_diff_is_a_real_render():
@@ -251,6 +256,10 @@ def test_the_ui_diff_is_a_real_render():
     text = _new_parts()["leads"]
     assert "`b = redamon.browser(<id of a" in text and "`b.goto('<page path>')`" in text
     assert "A curl of the page is not a render" in text
+    # A live AG11 curled /profile, hit the login redirect and POSTed /login 118 times.
+    flat = " ".join(text.split())
+    assert "logged in through the engagement's session, so you never submit the login form" in flat
+    assert "NEVER submit a login form, POST credentials, or loop authentication" in flat
 
 
 def test_an_exposed_files_request_covers_the_whole_pull():

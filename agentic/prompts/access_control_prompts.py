@@ -505,6 +505,10 @@ instead of re-crawling. To replay a captured request anonymously, use proxy_brai
 `redamon.replay(<txn id>, anonymous=True)`: it strips every credential the profile adds
 (bearer, cookie, header, basic) and every redacted header, and its Response prints as
 `<Response <status> <length>b anonymous>`. Print that line and hashes, never `.body`.
+A replay is an EXPLOITATION-phase request (proxy_brain refuses it in the informational
+phase): request `transition_phase` naming it, and replay once the operator approves.
+When the user asks only for an anonymous replay, send only that anonymous side: no
+logged-in request goes with it.
 
 **L2. The pair (every lead), GET only.**
 ```
@@ -532,10 +536,14 @@ says "Auth headers NOT attached", the comparison is anonymous-only: say so.
 browser renders, logged in, the page that calls the API: `b = redamon.browser(<id of a
 captured request to that host>)`, `b.goto('<page path>')`, then the script reads
 `b.text()` and closes it. A curl of the page is not a render: it runs no script and
-loads no sub-resource. The script compares the API's key paths with the labels and
-values present in the rendered text, by hash.
+loads no sub-resource, and it is logged in through the engagement's session, so you
+never submit the login form to reach it. The script compares the API's key paths with
+the labels and values present in the rendered text, by hash.
 Keys returned but never rendered are the evidence. The browser sends the session to
-the pinned host only. From the informational phase, finish L2-L3 and record them first,
+the pinned host only. A logged-in request is always `use_session=true` on execute_curl
+or `redamon.browser` (both use the credential the AuthProfile holds): NEVER submit a
+login form, POST credentials, or loop authentication. A plain curl that 302-redirects
+to /login only means that curl had no session; re-send it with `use_session=true`. From the informational phase, finish L2-L3 and record them first,
 then request `transition_phase` to exploitation naming this step, and run it once the
 operator approves.
 
