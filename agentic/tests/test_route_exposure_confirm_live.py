@@ -8,8 +8,8 @@ fire_record_finding) into a throwaway tenant:
   2. a `custom` finding naming another candidate lands the edge without
      promotion (the proof query's closed type list);
   3. a made-up id writes nothing;
-  4. a lead is confirmed only from the access_control skill, while any skill
-     may record its re-check of a signature finding.
+  4. a lead is confirmed only from the access_control skill while the module
+     is on, while any skill may record its re-check of a signature finding.
 The tenant is deleted afterwards. Self-skips unless the driver imports and a
 database answers:
 
@@ -86,14 +86,14 @@ class AgentProofPromotesTheCandidate(unittest.TestCase):
             s.run("CREATE (v:Vulnerability) SET v = $props", props=props)
         return props
 
-    def _record(self, finding_type, ids, skill="access_control"):
+    def _record(self, finding_type, ids, skill="access_control", module=True):
         self.writer._write_finding(
             _URI, _USER, _PASSWORD,
             finding_id=f"cf-{uuid.uuid4().hex[:12]}", chain_id=self.chain, step_id=self.step,
             user_id=self.uid, project_id=self.pid, finding_type=finding_type, severity="high",
             title="Unauthenticated admin route", description="", evidence="anon 200, 12 records",
             confidence=90, phase="exploitation", iteration=1, related_cves=[], related_ips=[],
-            related_finding_ids=ids, skill=skill)
+            related_finding_ids=ids, skill=skill, route_exposure_on=module)
 
     def _confirms(self, vid):
         with self.driver.session() as s:
@@ -140,6 +140,11 @@ class AgentProofPromotesTheCandidate(unittest.TestCase):
             self._record("vulnerability_confirmed", [lead["id"], signature["id"]], skill=skill)
         self.assertEqual(self._confirms(lead["id"]), [])
         self.assertEqual(len(self._confirms(signature["id"])), 4)
+        # With the module off, access_control has no proof standard to apply.
+        self._record("vulnerability_confirmed", [lead["id"], signature["id"]], skill="access_control",
+                     module=False)
+        self.assertEqual(self._confirms(lead["id"]), [])
+        self.assertEqual(len(self._confirms(signature["id"])), 5)
         self._record("vulnerability_confirmed", [lead["id"]], skill="access_control")
         self.assertEqual(self._confirms(lead["id"]), ["vulnerability_confirmed"])
 

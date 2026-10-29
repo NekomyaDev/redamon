@@ -837,6 +837,7 @@ def fire_record_finding(
     source_agent: str = "root",
     fireteam_id: Optional[str] = None,
     skill: str = "",
+    route_exposure_on: bool = False,
 ) -> None:
     if not neo4j_uri or not neo4j_password:
         return
@@ -863,6 +864,7 @@ def fire_record_finding(
         source_agent=source_agent,
         fireteam_id=fireteam_id,
         skill=skill,
+        route_exposure_on=route_exposure_on,
     )
 
 
@@ -874,7 +876,7 @@ def _write_finding(
     confidence, phase, iteration, related_cves, related_ips,
     related_finding_ids=None,
     agent_id="root", source_agent="root", fireteam_id=None,
-    skill="",
+    skill="", route_exposure_on=False,
 ):
     driver = _get_driver(uri, user, password)
     # MATCH step first so the finding is only created if the step exists
@@ -931,6 +933,7 @@ def _write_finding(
             session, finding_id, related_cves, related_ips, finding_type,
             user_id, project_id, evidence=evidence or "",
             related_finding_ids=related_finding_ids or [], skill=skill or "",
+            route_exposure_on=bool(route_exposure_on),
         )
 
     logger.debug("[%s/%s] ChainFinding created: %s (%s)", user_id, project_id, title[:60], finding_type)
@@ -998,6 +1001,7 @@ def _auto_extract_from_evidence(evidence: str) -> dict:
 def _resolve_finding_bridges(
     session, finding_id, related_cves, related_ips, finding_type, user_id, project_id,
     *, evidence: str = "", related_finding_ids=None, skill: str = "",
+    route_exposure_on: bool = False,
 ):
     """Create bridge rels from ChainFinding to recon nodes.
 
@@ -1022,12 +1026,13 @@ def _resolve_finding_bridges(
     # `id`, MalPackageFinding uses `finding_id`), and the edge is created only
     # when the node exists, so a hallucinated id writes nothing.
     #
-    # A route exposure LEAD (needs_agent_confirmation) is confirmed only by the
-    # skill that owns its proof standard, access_control. A live session with
-    # access_control off switched to rce and confirmed every lead on "200 with the
-    # predicted content", a public-by-design route included; its CONFIRMS edges
-    # would have promoted them all to T1. A signature finding is proven by recon
-    # already, so any skill may still record its re-check.
+    # A route exposure LEAD (needs_agent_confirmation) is confirmed only against
+    # its proof standard: the access_control skill's route exposure part, which
+    # renders only while the module is on. A live session with access_control off
+    # switched to rce and confirmed every lead on "200 with the predicted
+    # content", a public-by-design route included; its CONFIRMS edges would have
+    # promoted them all to T1. A signature finding is proven by recon already, so
+    # any skill may still record its re-check.
     finding_ids = [str(fid).strip() for fid in (related_finding_ids or [])
                    if fid and str(fid).strip()][:_MAX_CONFIRMS_IDS]
     if finding_ids:
@@ -1041,14 +1046,15 @@ def _resolve_finding_bridges(
             OPTIONAL MATCH (target:{"|".join(_CONFIRMABLE_LABELS)}
                             {{user_id: $uid, project_id: $pid}})
             WHERE (target.id = target_id OR target.finding_id = target_id)
-              AND ($skill = $lead_owner
+              AND (($skill = $lead_owner AND $route_exposure_on)
                    OR coalesce(target.source, '') <> 'route_exposure'
                    OR coalesce(target.needs_agent_confirmation, false) = false)
             FOREACH (_ IN CASE WHEN target IS NOT NULL THEN [1] ELSE [] END |
                 MERGE (f)-[:CONFIRMS]->(target))
             """,
             {"fid": finding_id, "finding_ids": finding_ids, "uid": uid, "pid": pid,
-             "skill": skill or "", "lead_owner": ROUTE_EXPOSURE_LEAD_OWNER},
+             "skill": skill or "", "lead_owner": ROUTE_EXPOSURE_LEAD_OWNER,
+             "route_exposure_on": bool(route_exposure_on)},
         )
 
     # FOUND_ON -> IP or Subdomain (pre-sort by type, then batch each)
