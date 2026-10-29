@@ -186,7 +186,7 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                 </div>
                 <p className={`${styles.fieldHint} ${styles.fieldHintCaution}`}>
                   Needs an authentication profile: set it in{' '}
-                  <TabLink onOpen={onOpenAuth}>Target &amp; Modules &gt; Authentication</TabLink>
+                  <TabLink onOpen={onOpenAuth}>Target &amp; Modules &gt; Authenticated Session</TabLink>
                   . Without one it still finds routes open to anyone.
                 </p>
               </div>

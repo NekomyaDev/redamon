@@ -71,14 +71,15 @@ describe('RouteExposureSection', () => {
   test('the authentication hint opens Target & Modules', () => {
     const onOpenAuth = vi.fn()
     renderSection({ routeExposureEnabled: true }, { onOpenAuth })
-    fireEvent.click(screen.getByRole('button', { name: /Target & Modules > Authentication/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Target & Modules > Authenticated Session' }))
     expect(onOpenAuth).toHaveBeenCalled()
   })
 
   test('without a callback the hint is plain text', () => {
     renderSection({ routeExposureEnabled: true })
     expect(screen.getByText(/Without one it still finds routes open to anyone/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Authentication/ })).toBeNull()
+    expect(screen.getByText(/Target & Modules > Authenticated Session/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Authenticated Session/ })).toBeNull()
   })
 
   test('the advanced fields are the five numeric registry keys', () => {
