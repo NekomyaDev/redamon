@@ -30,9 +30,13 @@ describe('ExpandedRowDetail route exposure block', () => {
     expect(screen.getByTestId('route-exposure-detail')).toHaveTextContent('Confirmed by the agent')
   })
 
-  it('keeps the raw properties beside it', () => {
+  it('keeps the raw properties beside it, after the summary', () => {
     render(<ExpandedRowDetail row={row('Vulnerability', lead)} />)
     expect(screen.getByText('leak_signals')).toBeInTheDocument()
+    // A wide table stretches the row past the viewport: the summary must lead.
+    const sections = [...screen.getByTestId('route-exposure-detail').parentElement!.children]
+    expect(sections[0]).toBe(screen.getByTestId('route-exposure-detail'))
+    expect(sections[1]).toHaveTextContent(/^Properties/)
   })
 
   it('a finding from another source has no block', () => {

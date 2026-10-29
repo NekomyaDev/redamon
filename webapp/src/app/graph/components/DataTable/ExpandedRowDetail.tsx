@@ -44,6 +44,22 @@ export const ExpandedRowDetail = memo(function ExpandedRowDetail({ row }: Expand
   return (
     <div className={styles.detail}>
       <div className={styles.sections}>
+        {/* The summary leads: a wide table stretches this row past the viewport,
+            so a section after Properties starts off-screen. */}
+        {routeExposure.length > 0 && (
+          <div className={styles.section} data-testid="route-exposure-detail">
+            <h4 className={styles.sectionTitle}>Route exposure</h4>
+            <div className={styles.propsGrid}>
+              {routeExposure.map(({ label, value }) => (
+                <div key={label} className={styles.propRow}>
+                  <span className={styles.propKey}>{label}</span>
+                  <span className={styles.propValue}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Properties */}
         <div className={styles.section}>
           <h4 className={styles.sectionTitle}>Properties</h4>
@@ -64,20 +80,6 @@ export const ExpandedRowDetail = memo(function ExpandedRowDetail({ row }: Expand
             </div>
           )}
         </div>
-
-        {routeExposure.length > 0 && (
-          <div className={styles.section} data-testid="route-exposure-detail">
-            <h4 className={styles.sectionTitle}>Route exposure</h4>
-            <div className={styles.propsGrid}>
-              {routeExposure.map(({ label, value }) => (
-                <div key={label} className={styles.propRow}>
-                  <span className={styles.propKey}>{label}</span>
-                  <span className={styles.propValue}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Connections In */}
         <div className={styles.section}>

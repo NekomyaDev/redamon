@@ -156,7 +156,7 @@ export function routeExposureDisplayFields(
   const pii = list(properties.pii_types)
   const records = num(properties.pii_record_estimate)
   push('Personal data', pii.length
-    ? `${pii.join(', ')}${records ? ` (up to ${records} distinct values)` : ''}`
+    ? `${pii.join(', ')}${records ? ` (up to ${records} distinct value${records === 1 ? '' : 's'})` : ''}`
     : '')
   push('Sensitive fields', list(properties.sensitive_fields).join(', '))
   push('Secret detectors', list(properties.secret_types).join(', '))

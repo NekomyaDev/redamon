@@ -57,6 +57,11 @@ describe('routeExposureDisplayFields', () => {
     expect(f['Login expected because']).toBe('new_reason')
   })
 
+  it('says one value, not one values', () => {
+    expect(asMap(routeExposureDisplayFields({ pii_types: ['email'], pii_record_estimate: 1 }))['Personal data'])
+      .toBe('email (up to 1 distinct value)')
+  })
+
   it('reads a Neo4j integer', () => {
     expect(asMap(routeExposureDisplayFields({ anon_status: { low: 200, high: 0 } }))['Answers'])
       .toBe('anonymous 200 · no login session covered this host')
