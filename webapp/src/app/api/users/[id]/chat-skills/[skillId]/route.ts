@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUserAccess } from '@/lib/session'
 import prisma from '@/lib/prisma'
+import { MAX_CHAT_SKILL_CONTENT_SIZE } from '@/lib/userSkills'
 
 interface RouteParams {
   params: Promise<{ id: string; skillId: string }>
@@ -78,8 +79,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       if (typeof body.content !== 'string') {
         return NextResponse.json({ error: 'content must be a string' }, { status: 400 })
       }
-      if (body.content.length > 50 * 1024) {
-        return NextResponse.json({ error: 'content exceeds maximum size of 50KB' }, { status: 400 })
+      if (body.content.length > MAX_CHAT_SKILL_CONTENT_SIZE) {
+        return NextResponse.json({ error: `content exceeds maximum size of ${MAX_CHAT_SKILL_CONTENT_SIZE / 1024}KB` }, { status: 400 })
       }
       data.content = body.content
     }

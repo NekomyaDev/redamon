@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Before anything reads the body: past 10 MB the proxy would truncate it into "Invalid JSON".
   if (Number(request.headers.get('content-length') || 0) > MAX_SKILL_BATCH_BYTES) {
     return NextResponse.json(
-      { error: 'This batch is larger than 8 MB; upload it in two batches.', code: 'batch_too_large' }, { status: 413 })
+      { error: 'This batch is larger than 8 MB; upload it in smaller batches.', code: 'batch_too_large' }, { status: 413 })
   }
   try {
     const { id } = await params

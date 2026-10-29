@@ -25,6 +25,7 @@ vi.mock('@/lib/session', () => ({
 vi.mock('@/lib/audit', () => ({ writeAudit: async (e: Record<string, unknown>) => void h.audits.push(e) }))
 
 import { createFakePrisma, type FakePrisma } from '@/lib/plugins/__testing__/fakePrisma'
+import { MAX_CONTENT_SIZE } from '@/lib/userSkills'
 import { POST } from './route'
 
 let db: FakePrisma
@@ -78,10 +79,10 @@ describe('POST attack-skills/import-community', () => {
     expect(db.rawCalls.some((c) => c.sql.includes('pg_advisory_xact_lock') && c.values[0] === 'user_attack_skills:alice')).toBe(true)
   })
 
-  test('content over 50 KB is skipped as tooLarge', async () => {
+  test('content over MAX_CONTENT_SIZE is skipped as tooLarge', async () => {
     wire(
       [{ id: 'big', name: 'Big' }, { id: 'ok', name: 'Ok' }],
-      { big: { content: 'X'.repeat(51 * 1024) }, ok: { content: 'small' } },
+      { big: { content: 'X'.repeat(MAX_CONTENT_SIZE + 1) }, ok: { content: 'small' } },
     )
     const { body } = await run()
     expect(body.imported).toBe(1)
@@ -181,7 +182,7 @@ describe('POST attack-skills/import-community', () => {
         { id: 'dup', name: 'dup' }, { id: 'big', name: 'Big' }, { id: 'down', name: 'Down' },
         { id: 'empty', name: 'Empty' }, { id: 'ok', name: 'Ok' },
       ],
-      { dup: { content: 'x' }, big: { content: 'x'.repeat(50 * 1024 + 1) }, down: 'http_error', empty: { content: '' }, ok: { content: 'x' } },
+      { dup: { content: 'x' }, big: { content: 'x'.repeat(MAX_CONTENT_SIZE + 1) }, down: 'http_error', empty: { content: '' }, ok: { content: 'x' } },
     )
     const { body } = await run()
     expect(body.skippedBy).toEqual({ duplicate: 1, limit: 0, fetchFailed: 1, tooLarge: 1, invalid: 1 })

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUserAccess } from '@/lib/session'
 import prisma from '@/lib/prisma'
+import { MAX_CHAT_SKILL_CONTENT_SIZE } from '@/lib/userSkills'
 
 const AGENT_API_URL = process.env.AGENT_API_URL || 'http://localhost:8090'
 
 // Mirror the caps the manual POST path enforces so bulk import cannot be used
 // to bypass them (content size, per-user ceiling, description length).
-const MAX_CONTENT_SIZE = 50 * 1024 // 50KB
 const MAX_SKILLS_PER_USER = 50
 const MAX_DESCRIPTION = 500
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const skillData = await contentRes.json()
 
         const content = typeof skillData.content === 'string' ? skillData.content : ''
-        if (!content || content.length > MAX_CONTENT_SIZE) {
+        if (!content || content.length > MAX_CHAT_SKILL_CONTENT_SIZE) {
           skipped++
           continue
         }

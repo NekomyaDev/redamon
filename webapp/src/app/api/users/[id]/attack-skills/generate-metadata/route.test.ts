@@ -34,6 +34,7 @@ vi.mock('@/lib/audit', () => ({ writeAudit: async (e: Record<string, unknown>) =
 
 import { POST } from './route'
 import { contentSha256 } from '@/lib/userSkillWrites'
+import { MAX_CONTENT_SIZE } from '@/lib/userSkills'
 
 const MODEL = 'claude-haiku-4-5'
 const params = (id: string) => ({ params: Promise.resolve({ id }) })
@@ -119,7 +120,7 @@ describe('generate-metadata: the model and the agent', () => {
     ['empty fields', { items: [item('a', { fields: [] })] }],
     ['an unknown field', { items: [item('a', { fields: ['name', 'content'] })] }],
     ['blank content', { items: [item('a', { content: '  \n' })] }],
-    ['oversized content', { items: [item('a', { content: 'x'.repeat(50 * 1024 + 1) })] }],
+    ['oversized content', { items: [item('a', { content: 'x'.repeat(MAX_CONTENT_SIZE + 1) })] }],
     ['an overlong key', { items: [item('k'.repeat(65))] }],
     ['an overlong name', { items: [item('a', { name: 'n'.repeat(101) })] }],
     ['an overlong file name', { items: [item('a', { fileName: `${'f'.repeat(253)}.md` })] }],

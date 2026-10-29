@@ -2918,8 +2918,8 @@ def _skill_metadata_size_error(body: SkillMetadataRequest, model: str) -> Option
     if not 1 <= len(body.items) <= skill_metadata.MAX_ITEMS:
         return refuse(f"Send 1 to {skill_metadata.MAX_ITEMS} skills")
     for item in body.items:
-        if not item.content.strip() or len(item.content) > 50 * 1024:
-            return refuse("Each skill needs a text of at most 50 KB")
+        if not item.content.strip() or len(item.content) > skill_metadata.CONTENT_MAX_CHARS:
+            return refuse(f"Each skill needs a text of at most {skill_metadata.CONTENT_MAX_CHARS // 1024} KB")
         if not (item.want_name or item.want_description):
             return refuse("Each skill must ask for a name or a description")
         if len(item.key) > 64:

@@ -1188,7 +1188,7 @@ is the whole design: **approving never changes the skill**. It saves the propose
   person's to remove before they pick the skill. Session binding limits the **plugin**, not the person: an owner can write rows
   into their own sessions, but only ever about their own skills.
 - **What `override.get` answers.** One plain part, `body` (the skill's text, used verbatim:
-  no placeholders), its SHA-256, `maxChars` 51,200 (UTF-16 code units, the upload limit),
+  no placeholders), its SHA-256, `maxChars` 512,000 (UTF-16 code units, the upload limit),
   `active: null`, the pending count, and `lineage {rootName, version}`.
 - **What `override.propose` takes.** `scope: "user"` only; parts exactly `{body}`;
   `readSha256.body` **required** (the person can edit their skill at any time: 409

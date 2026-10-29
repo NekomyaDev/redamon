@@ -27,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+import { MAX_CHAT_SKILL_CONTENT_SIZE } from '@/lib/userSkills'
 import { POST } from './route'
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) })
@@ -53,12 +54,12 @@ beforeEach(() => {
 })
 
 describe('POST chat-skills/import-community — caps', () => {
-  test('skips a skill whose content exceeds the 50KB cap', async () => {
+  test('skips a skill whose content exceeds MAX_CHAT_SKILL_CONTENT_SIZE', async () => {
     mockFindMany.mockResolvedValue([])
     wireFetch(
       [{ id: 'big', name: 'Big' }, { id: 'ok', name: 'Ok' }],
       {
-        big: { name: 'Big', description: 'd', content: 'X'.repeat(51 * 1024) },
+        big: { name: 'Big', description: 'd', content: 'X'.repeat(MAX_CHAT_SKILL_CONTENT_SIZE + 1) },
         ok: { name: 'Ok', description: 'd', content: 'small' },
       },
     )

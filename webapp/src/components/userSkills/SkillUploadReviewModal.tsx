@@ -14,7 +14,7 @@ import {
   type BlockingReason, type DraftRow, type GeneratedItem, type PickedFile,
 } from '@/lib/skillUploadDraft'
 import {
-  DESCRIPTION_MAX_CHARS, MAX_ENABLED_USER_SKILLS_PER_PROJECT, MAX_SKILL_BATCH_BYTES, NAME_MAX_CHARS,
+  DESCRIPTION_MAX_CHARS, MAX_CONTENT_SIZE, MAX_ENABLED_USER_SKILLS_PER_PROJECT, MAX_SKILL_BATCH_BYTES, NAME_MAX_CHARS,
   SKILL_METADATA_ITEMS_PER_REQUEST, type BatchItemRefusal,
 } from '@/lib/userSkills'
 import { postUserSkillsChanged } from '@/lib/userSkillsChannel'
@@ -52,7 +52,7 @@ const PROBLEM_TEXT: Record<NonNullable<DraftRow['problem']>, string> = {
   not_markdown: 'Not a Markdown file.',
   empty: 'The file is empty.',
   not_text: 'Not a text file.',
-  too_large: "Larger than 50 KB: it can't be uploaded.",
+  too_large: `Larger than ${MAX_CONTENT_SIZE / 1024} KB: it can't be uploaded.`,
   over_skill_limit: 'Over your 1,000-skill limit: delete some skills first.',
 }
 
@@ -70,7 +70,7 @@ const COMMITTED_TEXT = 'These skills appear to have been uploaded. Check your li
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const sizeMb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1)
 const tooLargeText = (bytes: number) =>
-  `This batch is ${sizeMb(bytes)} MB, above the 8 MB limit. Remove some files, or upload them in two batches.`
+  `This batch is ${sizeMb(bytes)} MB, above the 8 MB limit. Remove some files, or upload them in smaller batches.`
 
 function blockingTitle(reasons: BlockingReason[]): string | null {
   const count = (r: BlockingReason) => reasons.filter((x) => x === r).length
