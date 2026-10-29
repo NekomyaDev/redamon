@@ -28,6 +28,8 @@ def candidate_query(kinds, pending: bool = True) -> str:
         "RETURN v.id AS id, v.exposure_kind AS kind, v.route_class AS route_class,\n"
         "       v.matched_at AS url, coalesce(e.method, v.http_method) AS method,\n"
         "       v.anon_status AS anon, v.authed_status AS authed, v.auth_expected_by AS expected,\n"
+        "       any(x IN coalesce(v.auth_expected_by, []) WHERE x IN\n"
+        "           ['openapi', 'siblings_locked', 'version_locked', 'vary_auth']) AS login_declared,\n"
         "       v.leak_signals AS leaks, v.pii_types AS pii, v.sensitive_fields AS fields,\n"
         "       v.generated_by AS generated_by, v.variant_of AS variant_of, v.signature AS signature,\n"
         "       v.confidence AS confidence, v.route_jev_sensitivity AS jev\n"

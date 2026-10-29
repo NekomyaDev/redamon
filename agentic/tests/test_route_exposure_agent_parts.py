@@ -158,7 +158,9 @@ def test_a_declared_login_is_proof_without_sensitive_content():
     # API's own declaration (or locked siblings) is the proof; the sensitivity
     # rejection holds only for a lead with none of those signals.
     assert "the content need not be sensitive" in proof
-    assert reject.startswith("none of (a)")
+    # The query computes the signal, so the model reads one boolean, not list semantics.
+    assert "`login_declared` is true" in proof and reject.startswith("`login_declared` is false")
+    assert "['openapi', 'siblings_locked', 'version_locked', 'vary_auth']) AS login_declared" in _new_parts()["leads"]
 
 
 def test_a_lead_is_reread_with_the_same_cypher_never_in_plain_english():
