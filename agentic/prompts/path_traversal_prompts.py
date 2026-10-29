@@ -1236,7 +1236,7 @@ each, recorded against its id. Values stay in kali files, always.
 
 | Kind | Recipe | Proof |
 | --- | --- | --- |
-| vcs_exposure (.git) | execute_curl `/.git/HEAD` into a file, read the ref, curl `/.git/<ref>`, curl that ONE loose object `/.git/objects/xx/...`; an execute_code script inflates it with `zlib.decompressobj().decompress(data, 65536)` | the inflated header starts `commit `; print the tree hash prefix only |
+| vcs_exposure (.git) | execute_curl `/.git/HEAD` and `/.git/config` into files, read the ref from HEAD, curl `/.git/<ref>`, curl that ONE loose object `/.git/objects/xx/...`; an execute_code script inflates it with `zlib.decompressobj().decompress(data, 65536)`. HEAD and config alone prove nothing (any static page can say `ref:` or `[core]`), and one walk proves every vcs_exposure finding of that base URL: record each finding's id with it | the inflated header starts `commit `; print the tree hash prefix only |
 | vcs_exposure (.svn / .hg) | curl `/.svn/wc.db` with `Range: bytes=0-15`, or `/.hg/requires` | the SQLite magic or the known header |
 | env_file, config_file | curl the file into /tmp (256 KiB at most, else a Range); the script counts KEY=value lines, matches secret shapes by detector name, prints names and counts | two or more KEY=value lines (env), `<configuration>` (config) |
 | backup_file | HEAD, then `Range: bytes=0-1023`; the script reads the magic | an archive, SQL or PHP-source magic, different from the original file's answer |
@@ -1250,8 +1250,10 @@ SEPARATE `credential_found` entry with NO ids (its value never written anywhere)
 - secret validation: {validate_secrets}
 
 When git reconstruction is DISABLED: do not download repository objects beyond the
-four above (HEAD, config, the ref, one object). When secret validation is DISABLED:
-do not call any third-party API with a found secret.
+four above (HEAD, config, the ref, one object). When secret validation is ENABLED:
+once a file's proof is recorded, validate every secret-shaped key it holds with the
+part below, one identity call per key, before you complete. When it is DISABLED: do
+not call any third-party API with a found secret.
 
 In EVERY phase, the exploitation phase included, for these artifacts: never `git clone`,
 `wget -r` or otherwise walk or mirror an exposed `.git` (the reconstruct step, when it
@@ -1263,7 +1265,10 @@ full: HEAD and `Range` reads only.
 PATH_TRAVERSAL_GIT_RECONSTRUCT = """
 ## RECONSTRUCT AN EXPOSED .git (enabled: switch on and data exfiltration allowed by the RoE)
 
-EXPLOITATION phase. Everything stays in kali under `/tmp/rex-git-<id>/`.
+EXPLOITATION phase. From the informational phase, record the minimal proofs first,
+then request `transition_phase` to exploitation naming this step, and run it once the
+operator approves; do not complete the session with it still pending. Everything
+stays in kali under `/tmp/rex-git-<id>/`.
 
 1. Start a background job with job_spawn, `tool_name: execute_code`: a Python script
    that walks refs, then commits, trees and blobs from `<base>/.git/`, inflating each

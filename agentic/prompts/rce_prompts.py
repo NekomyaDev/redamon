@@ -1288,6 +1288,10 @@ Prove each console's real state and each endpoint's exposure, without exploiting
 | actuator heapdump | `HEAD /actuator/heapdump` | 200, octet-stream and a size | GET it, unless heapdump analysis is ENABLED |
 | pprof / server-status | GET the index into a file | the signature | none |
 
+The unlocked console's `1+1` is its proof, and it needs the EXPLOITATION phase: from
+the informational phase, record the other proofs first, then request
+`transition_phase` naming that one request, and send it once the operator approves.
+
 Record each with `vulnerability_confirmed` and its id. The `1+1` output is a SEPARATE
 `exploit_success` entry with NO ids. Further exploitation follows this skill's own
 rules above, unchanged.
@@ -1302,7 +1306,10 @@ When heapdump analysis is DISABLED: HEAD only on `/actuator/heapdump`, never a G
 RCE_HEAPDUMP_ANALYSIS = """
 ## ANALYSE AN EXPOSED HEAP DUMP (enabled: switch on, data exfiltration allowed, sensitive data handling above "no access")
 
-EXPLOITATION phase, kali-local:
+EXPLOITATION phase, kali-local. From the informational phase, record the console and
+endpoint proofs first, then request `transition_phase` to exploitation naming this
+step, and run it once the operator approves; do not complete the session with it
+still pending.
 
 1. A job_spawn job, `tool_name: execute_curl`, args
    `-s -o /tmp/rex-heap-<id>.hprof --max-filesize 536870912 '<url>'` (the 512 MiB cap

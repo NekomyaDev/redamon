@@ -501,7 +501,10 @@ the access-control workflow above. Never reuse a count from an earlier turn.
 **L1. Pull the leads (ordered, bounded, paged).**
 """ + _candidate_query(["anonymous_access", "sensitive_data"]) + """
 When TrafficMind is on, read the original request with proxy_brain's read helpers
-instead of re-crawling.
+instead of re-crawling. To replay a captured request anonymously, use proxy_brain's
+`redamon.replay(<txn id>, anonymous=True)`: it strips every credential the profile adds
+(bearer, cookie, header, basic) and every redacted header, and its Response prints as
+`<Response <status> <length>b anonymous>`. Print that line and hashes, never `.body`.
 
 **L2. The pair (every lead), GET only.**
 ```
@@ -526,10 +529,15 @@ says "Auth headers NOT attached", the comparison is anonymous-only: say so.
 | kind sensitive_data (any class) | the logged-in body carries sensitive key paths, OR 3 or more records whose identifier hashes differ from the session's own (hash the identifier fields of a /me-style route the same way and print only the hash prefix) | only the session's own record and no sensitive key path |
 
 **L4. UI-vs-API diff** (EXPLOITATION phase only, excessive data). proxy_brain's
-browser renders, logged in, the page that calls the API; a script compares the
-API's key paths with the labels and values present in the rendered text, by hash.
+browser renders, logged in, the page that calls the API: `b = redamon.browser(<id of a
+captured request to that host>)`, `b.goto('<page path>')`, then the script reads
+`b.text()` and closes it. A curl of the page is not a render: it runs no script and
+loads no sub-resource. The script compares the API's key paths with the labels and
+values present in the rendered text, by hash.
 Keys returned but never rendered are the evidence. The browser sends the session to
-the pinned host only.
+the pinned host only. From the informational phase, finish L2-L3 and record them first,
+then request `transition_phase` to exploitation naming this step, and run it once the
+operator approves.
 
 **L5. Record, then verify.** As below. Record each proven lead in the response that
 read its proof.

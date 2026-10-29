@@ -77,6 +77,10 @@ def test_the_state_part_names_what_the_live_session_requested(skill):
         assert route in text
     assert "Informational phase: read-only" in text
     assert "Exploitation phase: a write" in text
+    # A live exploitation turn fuzzed with a stock wordlist and hit /logout, then
+    # requested /account/reset: the ban holds in every phase.
+    assert "In every phase, never request a route that ends or changes a session" in text
+    assert "grep -viE 'logout|sign-?out|reset|delete|remove|deactivate|unsubscribe|cancel'" in text
 
 
 @pytest.mark.parametrize("text", ALL_PARTS)

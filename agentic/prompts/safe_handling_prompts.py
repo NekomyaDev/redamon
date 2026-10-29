@@ -38,10 +38,13 @@ data handling above). Prove with derived facts instead:
 _READ_ONLY = """
 ## REQUESTS THAT CHANGE STATE
 
-- Informational phase: read-only. GET, HEAD and OPTIONS only, and never a route that
-  ends or changes a session or an account, whatever its method: logout / signout,
-  password or account reset, delete, deactivate, unsubscribe, cancel. One such request
-  can log out the session you test with or change a real user's account."""
+- In every phase, never request a route that ends or changes a session or an account,
+  whatever its method: logout / signout, password or account reset, account deletion
+  or deactivation, unsubscribe, cancel. One such request can log out the session you
+  test with or change a real user's account. Before any discovery fuzz, filter those
+  words out of the wordlist first:
+  `grep -viE 'logout|sign-?out|reset|delete|remove|deactivate|unsubscribe|cancel'`.
+- Informational phase: read-only. GET, HEAD and OPTIONS only."""
 
 
 ACCESS_CONTROL_SAFE_VALUES = _values(

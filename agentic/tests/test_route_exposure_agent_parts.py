@@ -211,3 +211,43 @@ def test_exploitation_only_steps_say_so():
     assert "EXPLOITATION phase only" in parts["leads"]
     assert "EXPLOITATION phase" in parts["git"] and "EXPLOITATION phase" in parts["heapdump"]
     assert "Unlocked (EXPLOITATION phase)" in parts["consoles"]
+
+
+def test_one_git_walk_proves_every_vcs_finding_and_head_alone_does_not():
+    # A live AG5 "proved" .git/HEAD and .git/config by their own bodies, never
+    # fetching the ref or an object.
+    text = _new_parts()["exposed_files"]
+    row = next(line for line in text.splitlines() if line.startswith("| vcs_exposure (.git)"))
+    assert "`/.git/HEAD` and `/.git/config`" in row
+    assert "HEAD and config alone prove nothing" in row
+    assert "one walk proves every vcs_exposure finding of that base URL" in row
+
+
+def test_exploitation_only_steps_ask_for_the_phase():
+    # Live sessions in the informational phase completed without the gated step,
+    # since no part said to request the phase it needs.
+    flat = {name: " ".join(text.split()) for name, text in _new_parts().items()}
+    for name in ("git", "heapdump", "consoles", "leads"):
+        assert "request `transition_phase` to exploitation naming" in flat[name] or \
+            "request `transition_phase` naming that one request" in flat[name], name
+
+
+def test_validation_runs_whenever_its_switch_is_on():
+    text = _new_parts()["exposed_files"]
+    assert "When secret validation is ENABLED:" in text
+    assert "one identity call per key, before you complete" in text
+
+
+def test_an_anonymous_replay_uses_proxy_brain_and_prints_no_body():
+    # A live AG10 re-requested the exports with curl and never exercised the replay.
+    text = _new_parts()["leads"]
+    assert "`redamon.replay(<txn id>, anonymous=True)`" in text
+    assert "`<Response <status> <length>b anonymous>`" in text
+    assert "never `.body`" in text
+
+
+def test_the_ui_diff_is_a_real_render():
+    # A live AG11 fetched the page with curl: no script ran, no sub-resource loaded.
+    text = _new_parts()["leads"]
+    assert "`b = redamon.browser(<id of a" in text and "`b.goto('<page path>')`" in text
+    assert "A curl of the page is not a render" in text
