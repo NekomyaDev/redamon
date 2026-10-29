@@ -1558,6 +1558,7 @@ def _build_route_exposure_data_from_graph(domains, user_id: str, project_id: str
                 RETURN b.url AS base, b.host AS host, e.path AS path,
                        coalesce(e.method, 'GET') AS method, e.category AS category,
                        coalesce(e.sources, CASE WHEN e.source IS NULL THEN [] ELSE [e.source] END) AS sources,
+                       e.source AS creator,
                        e.openapi_security AS openapi_security, e.openapi_tags AS openapi_tags,
                        e.openapi_declared_only AS declared_only, e.status_code AS discovery_status
                 """,
@@ -1567,10 +1568,21 @@ def _build_route_exposure_data_from_graph(domains, user_id: str, project_id: str
                 base = record["base"]
                 if not base or not keep(url_host(base, record["host"] or "")):
                     continue
+                sources = [s for s in (record["sources"] or []) if isinstance(s, str)]
+                # A route the scan itself generated and wrote is not recon's input: a
+                # full run never reads it. Read back, it became a found route, lost its
+                # generated_by and variant_of (an old API version stopped being
+                # version_locked) and seeded variants of its own. The generators make it
+                # again from the same inputs. The creator is checked too, because the
+                # scan's enrichment sets sources to ['route_exposure'] on a crawler's
+                # route that had none.
+                if (_field(record, "creator") == "route_exposure"
+                        and all(s == "route_exposure" for s in sources)):
+                    continue
                 endpoints = by_base.setdefault(base, {"endpoints": {}})["endpoints"]
                 entry = endpoints.setdefault(record["path"], {
                     "methods": [], "category": record["category"] or "other",
-                    "sources": [s for s in (record["sources"] or []) if isinstance(s, str)],
+                    "sources": sources,
                     "declared_only": record["declared_only"] is True,
                 })
                 method = str(record["method"] or "GET").upper()

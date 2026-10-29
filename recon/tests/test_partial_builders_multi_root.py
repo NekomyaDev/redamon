@@ -138,6 +138,17 @@ class _Session:
                 rows.append({"base": url, "host": host, "path": "/api/v2/orders/1", "method": "HEAD",
                              "category": "api", "sources": ["openapi"], "openapi_security": None,
                              "openapi_tags": None, "declared_only": True, "discovery_status": 200})
+                # What a previous route exposure run wrote: a route it generated
+                # (created by it, listed by nobody else), and one a crawler found
+                # that it only enriched.
+                rows.append({"base": url, "host": host, "path": "/api/v1/orders/1", "method": "GET",
+                             "category": "api", "sources": ["route_exposure"], "creator": "route_exposure",
+                             "openapi_security": None, "openapi_tags": None, "declared_only": None,
+                             "discovery_status": None})
+                rows.append({"base": url, "host": host, "path": "/api/admin/export", "method": "GET",
+                             "category": "api", "sources": ["route_exposure"], "creator": "resource_enum",
+                             "openapi_security": None, "openapi_tags": None, "declared_only": None,
+                             "discovery_status": None})
         elif "USES_TECHNOLOGY" in cypher:
             rows.append({"url": "https://www.alpha.test", "technologies": ["Spring Boot", "Java:17"]})
         elif "form_input_names" in cypher:
@@ -450,6 +461,21 @@ class TestRouteExposureBuilder:
         ranking.score(route)
         assert {"openapi", "openapi_tag", "declared_only", "seen_denied"} <= set(route.hints)
         assert corpus.technologies["https://www.alpha.test"] == {"Spring Boot", "Java:17"}
+
+    def test_a_route_only_the_scan_created_is_not_read_back(self, graph):
+        eps = self.build()["resource_enum"]["by_base_url"]["https://www.alpha.test"]["endpoints"]
+        assert "/api/v1/orders/1" not in eps
+        # Created by a crawler: the scan's enrichment replaced its null sources,
+        # but it is still recon's route.
+        assert "/api/admin/export" in eps
+
+    def test_a_route_the_scan_wrote_is_generated_again_with_its_provenance(self, graph):
+        from recon.route_exposure import generators, harvest
+        corpus = harvest.harvest(self.build())
+        generators.generate(corpus, {"version_variants": True})
+        route = corpus.routes[("https://www.alpha.test", "/api/v1/orders/1", "GET")]
+        assert route.generated_by == "version"
+        assert route.variant_of == "/api/v2/orders/1"
 
     def test_no_roots_reads_nothing(self, graph):
         data = gb._build_route_exposure_data_from_graph([], "u1", "p1", settings={})
