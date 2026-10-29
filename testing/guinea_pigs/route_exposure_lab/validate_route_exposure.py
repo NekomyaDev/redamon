@@ -409,6 +409,17 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
                 failures.append(f"{role}: a full GET of {path}")
         if rules.get("no_credentials") and any(h["auth"] or h["cookie"] or h["api_key"] for h in window):
             failures.append(f"{role}: a request carried a credential")
+        if rules.get("anonymous_export_replay") and role == "main":
+            # The anonymous replay reached the lab with every credential stripped:
+            # a GET to an export route carrying no auth, cookie or API key. Only
+            # main serves the export routes.
+            export_re = re.compile(r"/(internal/users|api/v2/reports|api/admin)/export")
+            anon_export = [h for h in window if export_re.search(h["path"])
+                           and not (h["auth"] or h["cookie"] or h["api_key"])]
+            if not anon_export:
+                failures.append(f"{role}: no anonymous (credential-stripped) replay of an export route")
+            else:
+                report.append(f"- {role}: {len(anon_export)} anonymous export replay(s)")
         report.append(f"- {role}: {len(window)} request(s) in the session window")
     outsider = [h for h in hits("outsider") if h["t"] >= since]
     # A browser rendering a lab page loads the outsider's widget.js as a
@@ -424,6 +435,23 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
     # Proves the page was really rendered: its sub-resource from the outsider loaded.
     if (spec.get("hits") or {}).get("outsider_widget") and len(outsider) == len(aimed):
         failures.append("the outsider's /widget.js was never loaded (the page was not rendered)")
+
+    if spec.get("captures"):
+        # The capture store's side of the anonymous replay: a replay row stored with
+        # no credential, and no stored request of the project holding a credential
+        # value in clear (the ingest masks the auth header names, X-API-Key included).
+        anon_replays = int(_psql(
+            "select count(*) from captured_http_transactions where project_id = "
+            f"'{project_id}' and is_replay and not had_auth and started_at >= to_timestamp({since})") or 0)
+        report.append(f"- captures: {anon_replays} anonymous replay(s) stored in the session window")
+        if not anon_replays:
+            failures.append("no anonymous replay in the capture store")
+        clear = [v for v in EXPECTED["agent_leak_rules"]["static"] if not v.startswith("@") and int(_psql(
+            "select count(*) from captured_http_transactions where project_id = "
+            f"'{project_id}' and req_headers::text like '%{v}%'") or 0)]
+        report.append(f"- captures holding a credential in clear: {len(clear)}")
+        if clear:
+            failures.append(f"{len(clear)} credential value(s) stored in clear in the capture store")
 
     leftovers = subprocess.run(["docker", "exec", "redamon-kali", "sh", "-c", "ls /tmp | grep '^rex-' || true"],
                                capture_output=True, text=True).stdout.split()

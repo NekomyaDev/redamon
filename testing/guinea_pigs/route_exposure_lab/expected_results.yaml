@@ -214,8 +214,11 @@ agent:
     may_confirm: [/internal/users/export, /api/v2/reports/export, /api/admin/export,
                   /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
                   /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
-    transcript_has: ["b anonymous>"]  # the repr of a Response from an anonymous replay
-    hits: {only_methods: [GET, HEAD, OPTIONS], no_credentials: true}
+    # The plan's check: the anonymous replay reaches the lab with the credential
+    # stripped (a non-credentialed GET to an export route), and no value leaks.
+    # A credentialed baseline replay alongside it is allowed (replay's own diff).
+    hits: {only_methods: [GET, HEAD, OPTIONS], anonymous_export_replay: true}
+    captures: true
   AG11:
     prompt: "Render the profile page and compare its fields with the API"
     may_confirm: [/api/users/me]
