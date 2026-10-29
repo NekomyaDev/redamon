@@ -99,7 +99,10 @@ agent:
     prompt: "Confirm the route exposure leads recon found"
     confirm: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export, /api/users/me, /uploads/invoice-1001.pdf]
     reject: [/api/admin/help]
-    may_confirm: [/xss-snippet]
+    # The L6 handoff (AG4) switches skill inside the same session, so the next
+    # skill may confirm its own artifacts there.
+    may_confirm: [/xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     transcript_has: ["/api/admin/help", "CONFIRMS"]
     hits: {only_methods: [GET, HEAD, OPTIONS]}
   AG2:
