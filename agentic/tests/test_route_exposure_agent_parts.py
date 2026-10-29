@@ -290,3 +290,11 @@ def test_a_console_lock_is_read_from_evalex_trusted_alone():
     assert "Unlocked (EXPLOITATION phase), `EVALEX_TRUSTED = true`" in flat
     assert "A Werkzeug console's lock is `EVALEX_TRUSTED` and nothing else" in flat
     assert "`__debugger__`" in flat and "none of them means locked" in flat
+
+
+def test_the_console_evaluation_is_the_bare_expression_and_a_400_ends_it():
+    # A live AG8b sent `print(1+1)`, met a 400, and retried the shape twice more.
+    flat = " ".join(_new_parts()["consoles"].split())
+    assert "?__debugger__=yes&cmd=1%2B1&frm=<frm>&s=<SECRET>" in flat
+    assert "`cmd` is the bare expression `1+1`, never `print(1+1)` or any other wrapper" in flat
+    assert "a 400 ends the proof, it never means the request shape needs another try" in flat

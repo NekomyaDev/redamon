@@ -1286,7 +1286,7 @@ is not part of the proof.
 
 | Signature | Recipe | Proof | Never |
 | --- | --- | --- | --- |
-| Werkzeug debugger | curl the console page into a file; the script reads `EVALEX` and `EVALEX_TRUSTED` from the page's script block | `EVALEX = true` with `EVALEX_TRUSTED = false` is locked (it asks for a PIN): report "PIN-protected console" (exposed; the exploit is not attempted). Unlocked (EXPLOITATION phase), `EVALEX_TRUSTED = true`: ONE request evaluating `1+1` with the page's `SECRET` and `frm`, whose answer contains `2` | guess or compute a PIN; evaluate anything but `1+1` |
+| Werkzeug debugger | curl the console page into a file; the script reads `EVALEX` and `EVALEX_TRUSTED` from the page's script block | `EVALEX = true` with `EVALEX_TRUSTED = false` is locked (it asks for a PIN): report "PIN-protected console" (exposed; the exploit is not attempted). Unlocked (EXPLOITATION phase), `EVALEX_TRUSTED = true`: ONE GET `<console URL>?__debugger__=yes&cmd=1%2B1&frm=<frm>&s=<SECRET>` with the page's `frm` and `SECRET`; `cmd` is the bare expression `1+1`, never `print(1+1)` or any other wrapper; its answer contains `2` | guess or compute a PIN; evaluate anything but `1+1` |
 | Laravel Ignition | `GET /_ignition/health-check` | `"can_execute_commands": true`, plus the Ignition version when shown: "CVE-2021-3129 applicable" | POST `/_ignition/execute-solution`; any log-clear or phar chain |
 | Symfony profiler | `GET /_profiler/latest` into a file | the profiler token page | follow a link to phpinfo with credentials |
 | actuator env | curl `/actuator/env` into a file; the script counts property sources and the keys whose value is not masked (`******`) and looks secret | the counts | POST to `/actuator/env`, `/refresh`, `/restart`, `/shutdown`, or any jolokia URL |
@@ -1302,7 +1302,8 @@ the informational phase, record the other proofs first, then request
 `transition_phase` naming that one request, and send it once the operator approves.
 It is exactly ONE GET: never a POST, an OPTIONS or a retry with other parameters, and
 no method-support probe before or after it. If that one answer does not contain `2`,
-record the console as unlocked with the evaluation unconfirmed and stop there.
+whatever its status, record the console as unlocked with the evaluation unconfirmed and
+stop there: a 400 ends the proof, it never means the request shape needs another try.
 
 Record each with `vulnerability_confirmed` and its id. The `1+1` output is a SEPARATE
 `exploit_success` entry with NO ids. Further exploitation follows this skill's own
