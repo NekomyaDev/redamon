@@ -1252,6 +1252,11 @@ SEPARATE `credential_found` entry with NO ids (its value never written anywhere)
 When git reconstruction is DISABLED: do not download repository objects beyond the
 four above (HEAD, config, the ref, one object). When secret validation is DISABLED:
 do not call any third-party API with a found secret.
+
+In EVERY phase, the exploitation phase included, for these artifacts: never `git clone`,
+`wget -r` or otherwise walk or mirror an exposed `.git` (the reconstruct step, when it
+is enabled, is the only repository fetch), and never download a backup archive in
+full: HEAD and `Range` reads only.
 """ + _VALUES_IN_FILES + _RECORD_CONTRACT + _SAFETY_RULES).replace(
     "{{git_reconstruct}}", "{git_reconstruct}").replace("{{validate_secrets}}", "{validate_secrets}")
 

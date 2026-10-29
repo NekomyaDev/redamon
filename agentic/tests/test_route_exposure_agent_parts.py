@@ -173,6 +173,14 @@ def test_a_lead_is_reread_with_the_same_cypher_never_in_plain_english():
         assert "`expected` is the alias of `v.auth_expected_by`" in text
 
 
+def test_no_clone_and_no_full_backup_in_any_phase():
+    # In a live exploitation turn the generic workflow tried `git clone` with the
+    # reconstruct switch off and downloaded a 5 MB backup in full.
+    text = _new_parts()["exposed_files"]
+    assert "In EVERY phase, the exploitation phase included" in text
+    assert "never `git clone`" in text and "never download a backup archive in\nfull" in text
+
+
 def test_bodies_left_behind_are_removed_before_leaving_the_skill():
     for name in ("leads", "exposed_files", "consoles"):
         assert "removes every `/tmp/rex-*` file still there" in _new_parts()[name]

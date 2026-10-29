@@ -73,8 +73,9 @@ RECORD_CONTRACT = """
 
 - Fill `output_analysis.chain_findings` IN THE SAME RESPONSE that reads the proof
   (it is a field, not a tool): `finding_type: "vulnerability_confirmed"`,
-  `related_finding_ids: ["<the exact id>"]`, `confidence` 80 or more. Only a proof
-  type at 70 or more promotes the node to T1.
+  `related_finding_ids: ["<the exact id>"]`, `confidence` 80 or more, a `title` naming
+  the route and what it proves, and `evidence` (statuses, sizes, hash prefixes, key
+  names). Only a proof type at 70 or more promotes the node to T1.
 - "Record X as confirmed" written in `actionable_findings`, `thought` or `reasoning`
   records NOTHING: it is kept as a note without an id. Only a `chain_findings` entry
   writes the CONFIRMS edge.
