@@ -13,9 +13,11 @@
 import { NextResponse } from 'next/server'
 
 const PRISMA_CODE = /^P\d{4}$/
-const NEO4J_CODE = /^Neo\.[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+$/
-// Node errno (ECONNREFUSED, ENOSPC) and undici's own codes (UND_ERR_HEADERS_TIMEOUT).
-const NODE_CODE = /^(E[A-Z0-9_]{2,40}|UND_ERR_[A-Z_]{2,40})$/
+// Server codes (Neo.TransientError.General.DatabaseUnavailable) and the driver's own.
+const NEO4J_CODE = /^(Neo\.[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+|ServiceUnavailable|SessionExpired|ProtocolError)$/
+// Node errno (ECONNREFUSED, ENOSPC), undici's codes (UND_ERR_HEADERS_TIMEOUT) and
+// OpenSSL's certificate codes (DEPTH_ZERO_SELF_SIGNED_CERT, CERT_HAS_EXPIRED).
+const NODE_CODE = /^(E[A-Z0-9_]{2,40}|UND_ERR_[A-Z_]{2,40}|[A-Z]+(?:_[A-Z0-9]+){2,8})$/
 const CLASS_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/
 
 function codeOf(value: unknown): string | undefined {

@@ -28,9 +28,12 @@ describe('safeErrorCode', () => {
   test.each([
     ['a Prisma code', withCode('PrismaClientKnownRequestError', 'P2024'), 'P2024'],
     ['a Neo4j code', withCode('Neo4jError', 'Neo.TransientError.General.DatabaseUnavailable'), 'Neo.TransientError.General.DatabaseUnavailable'],
+    ['a Neo4j driver code', withCode('Neo4jError', 'ServiceUnavailable'), 'ServiceUnavailable'],
     ['a Node errno', withCode('Error', 'ENOSPC'), 'ENOSPC'],
     ['an undici errno nested in cause', undiciFailure('ECONNREFUSED'), 'ECONNREFUSED'],
     ['an undici code', withCode('Error', 'UND_ERR_HEADERS_TIMEOUT'), 'UND_ERR_HEADERS_TIMEOUT'],
+    ['an OpenSSL certificate code', withCode('Error', 'DEPTH_ZERO_SELF_SIGNED_CERT'), 'DEPTH_ZERO_SELF_SIGNED_CERT'],
+    ['an expired certificate', withCode('Error', 'CERT_HAS_EXPIRED'), 'CERT_HAS_EXPIRED'],
     ['a class name without a code', Object.assign(new Error('x'), { name: 'PrismaClientValidationError' }), 'PrismaClientValidationError'],
     ['a plain Error', new Error('boom'), 'internal_error'],
     ['a string', 'boom', 'internal_error'],
