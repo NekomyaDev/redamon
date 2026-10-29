@@ -6,7 +6,7 @@
   <b><i><big><big>Unmask the hidden before the world does</big></big></i></b>
 </p>
 <p align="center" style="font-size: 120%;">
-  An autonomous AI framework that chains reconnaissance, exploitation, and post-exploitation into a single pipeline, then goes further by triaging every finding, implementing code fixes, and opening pull requests on your repository. From first packet to merged patch, with human oversight at every critical step.
+  <b>RedAmon is an open-source, self-hosted AI penetration testing framework</b> that maps your attack surface into a graph, autonomously exploits it from a Kali sandbox with human approval gates, and opens pull requests that fix what it finds. From first packet to merged patch, with human oversight at every critical step.
 </p>
 
 <br/>
