@@ -17,6 +17,8 @@ interface JevProviderSectionProps {
   loading: boolean
   /** The provider list could not be loaded: "no token" would be a guess. */
   error: boolean
+  /** The load failure with its cause, e.g. "Couldn't load your providers (P1001 · HTTP 500)". */
+  errorText?: string
   onRetry: () => void
   formOpen: boolean
   onOpenForm: () => void
@@ -32,7 +34,7 @@ interface JevProviderSectionProps {
  * typed questions for recon hooks and never appears in a model picker.
  */
 export function JevProviderSection({
-  userId, provider, loading, error, onRetry, formOpen, onOpenForm, onFormDone, onDelete,
+  userId, provider, loading, error, errorText, onRetry, formOpen, onOpenForm, onFormDone, onDelete,
   onDirtyChange, usageChip,
 }: JevProviderSectionProps) {
   const Icon = JEV_TYPE.Icon
@@ -43,7 +45,7 @@ export function JevProviderSection({
   } else if (error) {
     body = (
       <div className={styles.error} role="alert">
-        <span>Couldn&apos;t load your providers.</span>
+        <span>{errorText ?? "Couldn't load your providers"}.</span>
         <button type="button" className="secondaryButton" onClick={onRetry}>
           <RefreshCw size={12} /> Retry
         </button>
