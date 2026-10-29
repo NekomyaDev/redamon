@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Start the lab on redamon-network, whatever /16 Docker gave it: the services
-# take <prefix>.93-.96 of the network's own subnet.
+# Start the lab on redamon-network and redamon_pentest-net, whatever /16 Docker
+# gave each: the services take <prefix>.93-.96 of each network's own subnet.
 set -euo pipefail
 cd "$(dirname "$0")"
-subnet=$(docker network inspect redamon-network --format '{{(index .IPAM.Config 0).Subnet}}')
-export LAB_NET_PREFIX="$(echo "$subnet" | cut -d. -f1-3)"
-echo "redamon-network $subnet -> lab on ${LAB_NET_PREFIX}.93-.96"
+prefix_of() {
+  docker network inspect "$1" --format '{{(index .IPAM.Config 0).Subnet}}' | cut -d. -f1-3
+}
+export LAB_NET_PREFIX="$(prefix_of redamon-network)"
+export PENTEST_NET_PREFIX="$(prefix_of redamon_pentest-net)"
+echo "lab on ${LAB_NET_PREFIX}.93-.96 (redamon-network) and ${PENTEST_NET_PREFIX}.93-.96 (redamon_pentest-net)"
 docker compose up -d --build "$@"

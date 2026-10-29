@@ -17,8 +17,15 @@ never committed.
 by default; Docker picks the subnet when the network is created). `./up.sh`
 reads it and starts the lab there.
 
+The lab also answers on `redamon_pentest-net` at the same last octets. The capture
+proxy (TrafficMind, and `proxy_brain` replay and browser sessions) is on that
+network only and cannot reach `redamon-network`, so a project that captures
+traffic is pinned at the pentest-net addresses and checked with
+`LAB_NETWORK=redamon_pentest-net python3 validate_route_exposure.py ...`. A page
+names the outsider on the network the request came in on.
+
 ```bash
-./up.sh                                   # build and start on redamon-network
+./up.sh                                   # build and start on both networks
 docker exec redamon-route-exposure-main cat /tmp/hits.jsonl   # what a scan sent
 docker exec redamon-route-exposure-main touch /tmp/flags/close-export   # S12: close a route
 python3 validate_route_exposure.py setup S1           # temp project over MCP

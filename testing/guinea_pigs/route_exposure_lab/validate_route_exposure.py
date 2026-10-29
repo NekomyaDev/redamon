@@ -41,8 +41,14 @@ ROLES = EXPECTED["roles"]
 CONTAINER = "redamon-route-exposure-{}"
 
 
+#: The lab answers on both networks at the same last octets. A project pinned at
+#: the pentest-net addresses (the ones the capture proxy reaches) is checked with
+#: LAB_NETWORK=redamon_pentest-net.
+LAB_NETWORK = os.environ.get("LAB_NETWORK", "redamon-network")
+
+
 def _prefix() -> str:
-    out = subprocess.run(["docker", "network", "inspect", "redamon-network", "--format",
+    out = subprocess.run(["docker", "network", "inspect", LAB_NETWORK, "--format",
                           "{{(index .IPAM.Config 0).Subnet}}"], capture_output=True, text=True, check=True)
     return ".".join(out.stdout.strip().split(".")[:3])
 

@@ -8,7 +8,10 @@
 # Pin recon projects (IP mode) at the bridge IPs; scan containers run --net=host
 # and cannot resolve container names. The addresses are LAB_NET_PREFIX.93-.96
 # (default 172.25.0); ./up.sh reads the prefix off redamon-network, whose subnet
-# Docker picks when the network is first created. The outsider (.96) is named by the other
+# Docker picks when the network is first created. The lab also answers on
+# redamon_pentest-net at PENTEST_NET_PREFIX.93-.96: the capture proxy (TrafficMind,
+# proxy_brain) is on that network only, so a project that captures traffic is
+# pinned at those addresses. The outsider (.96) is named by the other
 # services' JS and must receive 0 requests. Host aliases are loopback-only: the
 # lab serves open admin, debug and backup routes on purpose.
 
@@ -35,6 +38,8 @@ services:
     networks:
       redamon:
         ipv4_address: ${LAB_NET_PREFIX:-172.25.0}.93
+      pentest:
+        ipv4_address: ${PENTEST_NET_PREFIX:-172.28.0}.93
 
   route-exposure-twin:
     <<: *lab
@@ -45,6 +50,8 @@ services:
     networks:
       redamon:
         ipv4_address: ${LAB_NET_PREFIX:-172.25.0}.94
+      pentest:
+        ipv4_address: ${PENTEST_NET_PREFIX:-172.28.0}.94
 
   route-exposure-hostile:
     <<: *lab
@@ -55,6 +62,8 @@ services:
     networks:
       redamon:
         ipv4_address: ${LAB_NET_PREFIX:-172.25.0}.95
+      pentest:
+        ipv4_address: ${PENTEST_NET_PREFIX:-172.28.0}.95
 
   route-exposure-outsider:
     <<: *lab
@@ -65,8 +74,13 @@ services:
     networks:
       redamon:
         ipv4_address: ${LAB_NET_PREFIX:-172.25.0}.96
+      pentest:
+        ipv4_address: ${PENTEST_NET_PREFIX:-172.28.0}.96
 
 networks:
   redamon:
     external: true
     name: redamon-network
+  pentest:
+    external: true
+    name: redamon_pentest-net

