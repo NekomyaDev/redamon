@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUserAccess } from '@/lib/session'
 import prisma from '@/lib/prisma'
+import { internalError } from '@/lib/routeErrors'
 import { MAX_CHAT_SKILL_CONTENT_SIZE } from '@/lib/userSkills'
 
 interface RouteParams {
@@ -22,11 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(skills)
   } catch (error) {
-    console.error('Failed to fetch chat skills:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch chat skills' },
-      { status: 500 }
-    )
+    return internalError(error, 'Failed to fetch chat skills')
   }
 }
 
@@ -104,10 +101,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(skill, { status: 201 })
   } catch (error) {
-    console.error('Failed to create chat skill:', error)
-    return NextResponse.json(
-      { error: 'Failed to create chat skill' },
-      { status: 500 }
-    )
+    return internalError(error, 'Failed to create chat skill')
   }
 }

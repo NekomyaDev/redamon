@@ -25,7 +25,10 @@ import { importSummary } from '@/components/settings/AgentSkillsTab'
 import { useSkillUpload } from '@/components/userSkills/useSkillUpload'
 import { MAX_ENABLED_USER_SKILLS_PER_PROJECT, MAX_SKILLS_PER_USER, USER_SKILL_LIMIT_TEXT } from '@/lib/userSkills'
 import { postUserSkillsChanged, useUserSkillsChanged } from '@/lib/userSkillsChannel'
+import { formatApiError, readApiError, toApiError } from '@/lib/apiError'
 import styles from '../ProjectForm.module.css'
+
+const LOAD_FAILED = 'Your skills could not be loaded'
 
 type FormData = Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'user'>
 
@@ -193,7 +196,8 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
   const [userOpen, setUserOpen] = useState(true)
   const [userSkills, setUserSkills] = useState<UserSkillDef[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
+  // The failed read's " (code · HTTP n)"; null while the list is good.
+  const [loadError, setLoadError] = useState<string | null>(null)
   // Whose list is loaded: until it is the current user's, the cap and the free slots would be
   // counted from an empty list, so the upload buttons wait.
   const loadedFor = useRef<string | null>(null)
@@ -203,7 +207,7 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
 
   // Plugin skill-version controls, only for a saved project (X23).
   const savedProjectId = projectId ?? null
-  const { bySkill, rowActions, reload: reloadOverrides } = usePluginSkillOverrides(savedProjectId)
+  const { bySkill, rowActions, reload: reloadOverrides, error: pluginOverridesError } = usePluginSkillOverrides(savedProjectId)
   const [versionsSkill, setVersionsSkill] = useState<string | null>(null)
   const [reviewChangeSetId, setReviewChangeSetId] = useState<string | null>(null)
 
@@ -221,14 +225,14 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
       const resp = await fetch(`/api/users/${userId}/attack-skills`)
       if (resp.ok) {
         setUserSkills(await resp.json())
-        setLoadError(false)
+        setLoadError(null)
         loadedFor.current = userId
       } else {
-        setLoadError(true)
+        setLoadError(formatApiError({ ...(await readApiError(resp, LOAD_FAILED)), reason: '' }))
       }
     } catch (err) {
       console.error('Failed to fetch user attack skills:', err)
-      setLoadError(true)
+      setLoadError(formatApiError({ ...toApiError(err, LOAD_FAILED), reason: '' }))
     } finally {
       setLoading(false)
     }
@@ -285,7 +289,7 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
   })
   const uploadTitle = loading
     ? 'Loading your skills…'
-    : loadError ? 'Your skills could not be loaded. Reload the page to upload.'
+    : loadError !== null ? `${LOAD_FAILED}${loadError}. Reload the page to upload.`
       : loadedFor.current !== userId ? 'Loading your skills…'
         : userSkills.length >= MAX_SKILLS_PER_USER ? USER_SKILL_LIMIT_TEXT : undefined
   const uploadDisabled = !userId || !!uploadTitle
@@ -324,7 +328,10 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
     if (!userId) return
     try {
       const resp = await fetch(`/api/users/${userId}/attack-skills/${skillId}`)
-      if (!resp.ok) return
+      if (!resp.ok) {
+        alertError((await readApiError(resp, 'Failed to download the skill')).message)
+        return
+      }
       const skill = await resp.json()
       const blob = new Blob([skill.content], { type: 'text/markdown' })
       const url = URL.createObjectURL(blob)
@@ -335,8 +342,9 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Failed to download skill:', err)
+      alertError(toApiError(err, 'Failed to download the skill').message)
     }
-  }, [userId])
+  }, [userId, alertError])
 
   const importCommunityAgentSkills = useCallback(async () => {
     if (!userId || importing) return
@@ -345,9 +353,15 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
       const previousIds = new Set(userSkills.map(s => s.id))
 
       const resp = await fetch(`/api/users/${userId}/attack-skills/import-community`, { method: 'POST' })
-      const result = await resp.json()
       if (!resp.ok) {
-        alertError(result.error || 'Failed to import community skills')
+        alertError((await readApiError(resp, 'Failed to import community skills')).message)
+        return
+      }
+      const result = await resp.json().catch(() => null)
+      if (!result) {
+        // Skills may have landed even when the answer cannot be read.
+        postUserSkillsChanged({})
+        alertError(`Failed to read the import's answer (invalid_json · HTTP ${resp.status}). Check your skills list.`)
         return
       }
 
@@ -382,7 +396,7 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
       )
     } catch (err) {
       console.error('Failed to import community skills:', err)
-      alertError('Failed to import community skills')
+      alertError(toApiError(err, 'Failed to import community skills').message)
     } finally {
       setImporting(false)
     }
@@ -563,13 +577,20 @@ export function AttackSkillsSection({ data, updateField, projectId, onOpenRoe }:
               </div>
             )}
 
+            {pluginOverridesError && (
+              <div className={styles.skillListNote} role="alert">
+                {pluginOverridesError}{' '}
+                <button type="button" className="secondaryButton" onClick={reloadOverrides}>Retry</button>
+              </div>
+            )}
+
             {loading ? (
               <div className={styles.skillListNote}>
                 <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
               </div>
-            ) : userSkills.length === 0 && loadError ? (
+            ) : userSkills.length === 0 && loadError !== null ? (
               <div className={styles.skillListNote} role="alert">
-                Your skills could not be loaded. Reload the page.
+                {LOAD_FAILED}{loadError}. Reload the page.
               </div>
             ) : userSkills.length === 0 ? (
               <div className={styles.skillEmptyState}>

@@ -165,6 +165,34 @@ describe('generate-metadata: who may call it', () => {
   })
 })
 
+describe('generate-metadata: failures it did not expect', () => {
+  test('a settings read that throws is 500 with its Prisma code, never a bodiless 500', async () => {
+    h.settings.mockRejectedValue(Object.assign(new Error('Timed out: SELECT "featureModels"'), {
+      name: 'PrismaClientKnownRequestError', code: 'P2024',
+    }))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await generate({ items: [item('a')] })
+    const text = await res.text()
+    expect(res.status).toBe(500)
+    expect(JSON.parse(text)).toEqual({ error: 'Failed to generate the names and descriptions', code: 'P2024' })
+    expect(text).not.toContain('SELECT')
+    expect(h.agentFetch).not.toHaveBeenCalled()
+    log.mockRestore()
+  })
+
+  test("an agent crash is 502 with the agent's status", async () => {
+    h.agentFetch.mockResolvedValue(new Response('Internal Server Error', { status: 500 }))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await generate({ items: [item('a')] })
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({
+      error: 'The agent failed while handling this request. The details are in the agent log.',
+      upstreamStatus: 500,
+    })
+    log.mockRestore()
+  })
+})
+
 describe('generate-metadata: a file that holds a key is never sent', () => {
   test('the item is left out of the agent body and answered skill_contains_credentials', async () => {
     agentReply({ items: [{ key: 'b', name: 'Clean Flow', description: 'Clean.' }], model_used: MODEL })

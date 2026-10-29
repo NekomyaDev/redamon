@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { readJsonBody } from '@/lib/jsonBody'
 import { MAX_SKILL_BATCH_BYTES } from '@/lib/userSkills'
 import { requireOwnBrowserRequest } from '@/lib/userSkillRouteGuard'
+import { safeErrorCode } from '@/lib/routeErrors'
 import { auditActorFor, createUserSkillsBatch, userSkillErrorResponse } from '@/lib/userSkillWrites'
 
 interface RouteParams {
@@ -38,6 +39,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Its kind only: a Prisma message can quote the query's values, and an item's text can hold anything.
     const code = (error as { code?: unknown } | null)?.code
     console.error('Failed to upload a skill batch:', error instanceof Error ? error.name : typeof error, code ?? '')
-    return NextResponse.json({ error: 'Failed to upload the skills' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to upload the skills', code: safeErrorCode(error) }, { status: 500 })
   }
 }
