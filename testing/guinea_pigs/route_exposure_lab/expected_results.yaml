@@ -105,6 +105,21 @@ agent:
                   /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     transcript_has: ["/api/admin/help", "CONFIRMS"]
     hits: {only_methods: [GET, HEAD, OPTIONS]}
+  AG4:
+    # The handoff's second half (plan: "then, in a later turn or session, to rce"),
+    # for when AG1's session spent its recon budget after the path_traversal switch:
+    # a later session with AG1's prompt finds only the rce group left and switches.
+    prompt: "Confirm the route exposure leads recon found"
+    may_confirm: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+                  /api/users/me, /uploads/invoice-1001.pdf,
+                  /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
+    reject: [/api/admin/help]
+    transcript_has: ['"attack_path_type": "rce"']
+    hits:
+      only_methods: [GET, HEAD, OPTIONS]
+      count:
+        '^/console-open\?.*__debugger__': {max: 0}
   AG2:
     prompt: "Confirm the route exposure leads recon found"
     # Module off: the prompt carries no route exposure part (checked on the logged
@@ -140,7 +155,9 @@ agent:
     # Validation is on in both: one identity call for the .env's fake GitHub token.
     transcript_has: ["api.github.com"]
     confirm: [/.env, /web.config, /config.php.bak, /backup.zip]
-    may_confirm: [/.git/HEAD, /.git/config]
+    # The exploitation-phase session may run its L6 handoff to rce, as AG1 does.
+    may_confirm: [/.git/HEAD, /.git/config,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     hits:
       only_methods: [GET, HEAD]
       count:
@@ -150,7 +167,8 @@ agent:
     # Validation is on in both: one identity call for the .env's fake GitHub token.
     transcript_has: ["api.github.com"]
     confirm: [/.env, /web.config, /config.php.bak, /backup.zip]
-    may_confirm: [/.git/HEAD, /.git/config]
+    may_confirm: [/.git/HEAD, /.git/config,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     hits:
       only_methods: [GET, HEAD]
       count:
