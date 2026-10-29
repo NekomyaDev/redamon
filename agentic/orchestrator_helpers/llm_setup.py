@@ -291,7 +291,7 @@ def setup_llm(
             base_url="https://openrouter.ai/api/v1",
             temperature=0,
             default_headers={
-                "HTTP-Referer": "https://redamon.dev",
+                "HTTP-Referer": "https://www.redamon.org",
                 "X-Title": "RedAmon Agent",
             },
         )
