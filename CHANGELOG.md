@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The agent works the route exposure scan's results.** While the scan is on, three existing skills gain steps, with no new skill to enable: Access Control confirms or rejects each lead with an anonymous and a logged-in request, Path Traversal proves the exposed files, and RCE proves the debug consoles without exploiting them. Each proof is recorded against the finding's id and moves it to T1. Bodies stay in files in the Kali sandbox, so no value reaches the conversation. Three switches, off by default and also gated by the Rules of Engagement: reconstruct an exposed `.git`, validate the secrets found in exposed files, analyse an exposed heap dump. With Access Control off, the scan's settings show a "Half a cycle" alert.
 - **proxy_brain anonymous mode.** `replay`, `batch`, `fuzz` and the browser take `anonymous=True`, which strips every credential the authentication profile adds (and every redacted header); each response says whether it was sent `anonymous` or with the `session`. The logged-in browser now sends credentials to the pinned host only, never to third-party sub-resources.
 
+### Fixed
+
+- **Settings numbers.** Emptying a numeric setting and leaving the field restores its default, instead of saving 0 (which the save refused for most fields, and which meant "off" for some).
+- **Red Zone tables on a phone.** The toolbar wraps, so the Markdown export and the Filters menu are reachable on a narrow screen.
+- **Partial recon in IP mode.** A typed URL on one of the project's own addresses is accepted; the modal refused every typed URL as out of scope.
+
 ## [7.4.0] - 2026-10-27
 
 Fewer false positives, honest coverage, and scans that stop, pause and resume as they should.
