@@ -161,6 +161,16 @@ def test_a_declared_login_is_proof_without_sensitive_content():
     assert reject.startswith("none of (a)")
 
 
+def test_a_lead_is_reread_with_the_same_cypher_never_in_plain_english():
+    # A live run re-asked "return ... expected ..." in plain English; the
+    # text-to-Cypher step read a property that does not exist and the model
+    # rejected two true leads on the None it got back.
+    for name in ("leads", "exposed_files", "consoles"):
+        text = _new_parts()[name]
+        assert "re-run THIS query with `AND v.id IN ['<id>', ...]`" in text
+        assert "`expected` is the alias of `v.auth_expected_by`" in text
+
+
 def test_bodies_left_behind_are_removed_before_leaving_the_skill():
     for name in ("leads", "exposed_files", "consoles"):
         assert "removes every `/tmp/rex-*` file still there" in _new_parts()[name]

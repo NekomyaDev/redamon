@@ -35,7 +35,10 @@ def candidate_query(kinds, pending: bool = True) -> str:
         "LIMIT 50\n"
         "```\n"
         "Page with `AND v.id > '<last id>'` added to the WHERE. Copy every `id` exactly: the "
-        "record step needs it."
+        "record step needs it. To read a node's fields again, re-run THIS query with "
+        "`AND v.id IN ['<id>', ...]`; never ask for them in plain English: `expected` is the "
+        "alias of `v.auth_expected_by`, and a plain-English question names properties that do "
+        "not exist and gets None back for them."
     )
 
 
