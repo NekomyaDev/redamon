@@ -491,12 +491,17 @@ from llm_builder import (  # noqa: E402
     fetch_user_providers,
     is_model_unavailable_error,
     log_provider_error,
+    provider_error_details,
 )
 
 
-def _feature_error(code: str, model: str, status: int, error: str) -> JSONResponse:
+def _feature_error(code: str, model: str, status: int, error: str,
+                   exc: Optional[BaseException] = None) -> JSONResponse:
+    # The provider's class and HTTP status tell a bad key from a rate limit or
+    # an overflowing context; its message stays in the log (it can quote the key).
+    details = provider_error_details(exc) if exc is not None else {}
     return JSONResponse(
-        content={"error": error, "code": code, "model_used": model},
+        content={"error": error, "code": code, "model_used": model, **details},
         status_code=status,
     )
 
@@ -525,7 +530,7 @@ async def _build_feature_llm(feature: str, model: str, user_id: str):
     except Exception as exc:                                      # noqa: BLE001
         log_provider_error(feature, model, exc)
         return None, _feature_error("model_unavailable", model, 503,
-                                    MODEL_UNAVAILABLE_MESSAGE.format(model=model))
+                                    MODEL_UNAVAILABLE_MESSAGE.format(model=model), exc)
     return llm, None
 
 
@@ -541,10 +546,10 @@ async def _invoke_feature_llm(feature: str, model: str, llm, messages):
         log_provider_error(feature, model, exc)
         if is_model_unavailable_error(exc):
             return None, _feature_error("model_unavailable", model, 503,
-                                        MODEL_UNAVAILABLE_MESSAGE.format(model=model))
+                                        MODEL_UNAVAILABLE_MESSAGE.format(model=model), exc)
         return None, JSONResponse(
             content={"error": "The model call failed. Try again in a moment.",
-                     "model_used": model},
+                     "model_used": model, **provider_error_details(exc)},
             status_code=502,
         )
 
@@ -580,10 +585,10 @@ async def summarize_report(body: ReportSummarizeRequest):
         log_provider_error("Report summarizer", requested_model, exc)
         if is_model_unavailable_error(exc):
             return _feature_error("model_unavailable", requested_model, 503,
-                                  MODEL_UNAVAILABLE_MESSAGE.format(model=requested_model))
+                                  MODEL_UNAVAILABLE_MESSAGE.format(model=requested_model), exc)
         return JSONResponse(
             content={"error": "Failed to generate report narratives. The details are in the agent log.",
-                     "model_used": requested_model},
+                     "model_used": requested_model, **provider_error_details(exc)},
             status_code=500,
         )
     if isinstance(narratives, dict):
@@ -3128,12 +3133,35 @@ class TextToCypherRequest(BaseModel):
 
 
 class _CypherSetupError(Exception):
-    """Carries the (status, safe message) to answer with."""
+    """Carries the (status, safe message) to answer with, plus safe extra fields
+    (a code, the provider's class and HTTP status) for the body."""
 
-    def __init__(self, status: int, message: str):
+    def __init__(self, status: int, message: str, fields: Optional[dict] = None):
         super().__init__(message)
         self.status = status
         self.message = message
+        self.fields = dict(fields or {})
+
+
+def _cypher_model_error(exc: BaseException) -> _CypherSetupError:
+    """A failed model call while generating Cypher.
+
+    Not a bad query: retrying it with the "previous error" fed back would bill
+    the same refused key or exhausted quota three more times and then tell the
+    person to rephrase their question.
+    """
+    log_provider_error("text-to-cypher", "", exc)
+    details = provider_error_details(exc)
+    if is_model_unavailable_error(exc):
+        return _CypherSetupError(
+            503,
+            "The AI model could not be used. Check the project's AI model and its API key.",
+            {"code": "model_unavailable", **details},
+        )
+    return _CypherSetupError(
+        502, "The AI model call failed. Try again in a moment.",
+        {"code": "model_call_failed", **details},
+    )
 
 
 async def _build_cypher_manager(user_id: str, project_id: str):
@@ -3256,15 +3284,20 @@ async def _generate_validated_cypher(
 
     for attempt in range(max_retries):
         try:
-            if attempt == 0:
-                cypher = await manager._generate_cypher(question, for_graph_view=for_graph_view)
-            else:
-                cypher = await manager._generate_cypher(
-                    question,
-                    previous_error=last_error,
-                    previous_cypher=last_cypher,
-                    for_graph_view=for_graph_view,
-                )
+            try:
+                if attempt == 0:
+                    cypher = await manager._generate_cypher(question, for_graph_view=for_graph_view)
+                else:
+                    cypher = await manager._generate_cypher(
+                        question,
+                        previous_error=last_error,
+                        previous_cypher=last_cypher,
+                        for_graph_view=for_graph_view,
+                    )
+            except CypherGenerationTimeout:
+                raise
+            except Exception as gen_exc:                          # noqa: BLE001
+                raise _cypher_model_error(gen_exc) from gen_exc
 
             if manager._find_disallowed_write_operation(cypher):
                 raise _CypherSetupError(400, "Write operations are not allowed in data filters")
@@ -3327,7 +3360,7 @@ async def text_to_cypher(body: TextToCypherRequest):
             manager, body.question, body.user_id, body.project_id, body.for_graph_view
         )
     except _CypherSetupError as e:
-        return JSONResponse(content={"error": e.message}, status_code=e.status)
+        return JSONResponse(content={"error": e.message, **e.fields}, status_code=e.status)
     return JSONResponse(content={"cypher": cypher})
 
 
@@ -3371,7 +3404,7 @@ async def graph_nl_query(body: GraphNlQueryRequest):
         )
     except _CypherSetupError as e:
         return JSONResponse(
-            status_code=e.status, content={"error": e.message, "stage": "generate"}
+            status_code=e.status, content={"error": e.message, "stage": "generate", **e.fields}
         )
 
     from graph_db.tenant_filter import scope_query, TenantScopeError
@@ -4164,7 +4197,15 @@ async def graph_triage(body: GraphTriageRequest):
             return JSONResponse(status_code=503, content={
                 "error": "The graph was busy; nothing was changed. Try again.",
                 "code": "retry"})
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        # A Neo4j message quotes the Cypher and its values; its status code
+        # (Neo.ClientError.Schema...) or the class says enough to tell causes apart.
+        neo4j_code = getattr(e, "code", None)
+        error_class = (neo4j_code if isinstance(neo4j_code, str)
+                       and re.fullmatch(r"Neo\.[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+", neo4j_code)
+                       else type(e).__name__)
+        return JSONResponse(status_code=500, content={
+            "error": "The triage operation failed. The details are in the agent log.",
+            "code": "internal_error", "error_class": error_class})
 
     # An acknowledgement the CALLER can check. The agent's Python is baked into
     # its image while the webapp is a separate one, so a deploy that rebuilds
@@ -5371,6 +5412,7 @@ async def kali_terminal_proxy(websocket: WebSocket):
 
     await websocket.accept()
 
+    close_code, close_reason = 1000, ""
     try:
         async with websockets.connect(
             upstream_url,
@@ -5413,9 +5455,13 @@ async def kali_terminal_proxy(websocket: WebSocket):
 
     except Exception as e:
         logger.error("Kali terminal proxy error: %s", e)
+        # The class only: the terminal shows the reason, and the text can carry
+        # the upstream URL with the tenant ids in its query.
+        close_code = 1011
+        close_reason = f"Kali sandbox terminal unavailable ({type(e).__name__})"
     finally:
         try:
-            await websocket.close()
+            await websocket.close(code=close_code, reason=close_reason)
         except Exception:
             pass
 
@@ -5435,11 +5481,15 @@ async def agent_websocket(websocket: WebSocket):
 
     The client must send an 'init' message first to authenticate the session.
     """
+    # Closing before accept() refuses the handshake, which the browser sees as a
+    # bare 1006; accepting first lets the code and reason reach the drawer.
     if not orchestrator:
+        await websocket.accept()
         await websocket.close(code=1011, reason="Orchestrator not initialized")
         return
 
     if not ws_manager:
+        await websocket.accept()
         await websocket.close(code=1011, reason="WebSocket manager not initialized")
         return
 

@@ -33,6 +33,7 @@ from orchestrator_helpers.parsing import try_parse_llm_decision
 from orchestrator_helpers.config import get_identifiers, is_session_config_complete
 from orchestrator_helpers.finding_guard import unrecorded_confirmations, unrecorded_note
 from orchestrator_helpers.llm_retry import retry_llm_call
+from orchestrator_helpers.llm_retry import llm_error_reason
 from orchestrator_helpers.productivity import (
     audit_productivity_claim,
     axis_key,
@@ -980,7 +981,7 @@ async def think_node(state: AgentState, config, *, llm, guidance_queues, neo4j_c
                 thought="",
                 reasoning="LLM call failed after transient-error retries",
                 action="complete",
-                completion_reason=f"llm_error: {exc}",
+                completion_reason=llm_error_reason(exc),
                 updated_todo_list=[],
             )
             break

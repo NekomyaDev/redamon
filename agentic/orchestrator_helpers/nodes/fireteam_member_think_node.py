@@ -24,6 +24,7 @@ from prompt_safety import wrap_untrusted, UNTRUSTED_OUTPUT_GUIDANCE
 from orchestrator_helpers.parsing import try_parse_llm_decision
 from orchestrator_helpers.json_utils import normalize_content, json_dumps_safe
 from orchestrator_helpers.llm_retry import retry_llm_call
+from orchestrator_helpers.llm_retry import llm_error_reason
 import orchestrator_helpers.chain_graph_writer as chain_graph
 from orchestrator_helpers.productivity import (
     audit_productivity_claim,
@@ -1013,7 +1014,7 @@ async def fireteam_member_think_node(
             )
             return {
                 "task_complete": True,
-                "completion_reason": f"llm_error: {exc}",
+                "completion_reason": llm_error_reason(exc),
             }
 
         raw_content = normalize_content(response.content if hasattr(response, "content") else response)
