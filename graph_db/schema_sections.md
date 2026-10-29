@@ -1163,6 +1163,7 @@ not so you can query for one.
 - `(ui:UserInput)-[:PRODUCED]->(s:Subdomain)` - Partial recon run produced this subdomain
 - `(ui:UserInput)-[:PRODUCED]->(i:IP)` - Partial recon run produced this IP
 - `(ui:UserInput)-[:PRODUCED]->(e:Endpoint)` - Endpoint declared by an API specification document the operator gave a partial OpenAPI run
+- `(ui:UserInput)-[:PRODUCED]->(v:Vulnerability)` - Route exposure finding a partial run wrote for a base URL the operator typed
 - `(d:Domain)-[:HAS_EXTERNAL_DOMAIN]->(ed:ExternalDomain)` - Domain encountered foreign domain during recon
 - `(s:Subdomain)-[:BELONGS_TO]->(d:Domain)` - Subdomain belongs to Domain
 - `(d:Domain)-[:HAS_IP]->(i:IP)` - An address uncover's org-wide search tied to this org Domain, with no hostname to hang it on. NOT the apex's A record: the apex's own addresses are on `Subdomain {name: d.name}` via RESOLVES_TO, when the apex is a target

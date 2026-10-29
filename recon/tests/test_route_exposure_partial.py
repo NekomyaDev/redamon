@@ -81,7 +81,22 @@ def test_typed_urls_without_graph_targets_reach_the_scope():
     assert any(f["path"] == "/internal/users/export" for f in recon_data["route_exposure"]["findings"])
     assert "/internal/users/export" in app.paths()
     client.create_user_input_node.assert_called_once()
-    assert client.create_user_input_node.call_args.kwargs["user_input_data"]["tool_id"] == "RouteExposure"
+    data = client.create_user_input_node.call_args.kwargs["user_input_data"]
+    assert data["tool_id"] == "RouteExposure"
+    # The UserInput PRODUCED the run's findings, or the partial run deletes it as
+    # an orphan (_cleanup_orphan_user_inputs).
+    ui_id, linked, uid, pid = client.link_route_exposure_user_input.call_args[0]
+    assert (ui_id, uid, pid) == (data["id"], "user1", "proj1")
+    assert ("/internal/users/export", "anonymous_access") in {(f["path"], f["exposure_kind"]) for f in linked}
+
+
+def test_only_findings_on_a_typed_base_url_are_linked():
+    client = MagicMock()
+    findings = [{"baseurl": "http://127.0.0.1:8080", "path": "/a", "exposure_kind": "env_file"},
+                {"baseurl": "http://127.0.0.1", "path": "/b", "exposure_kind": "env_file"}]
+    mod._link_user_urls(client, ["http://127.0.0.1:8080/x"], None, ["ip-targets.p"], "u", "p", findings)
+    linked = client.link_route_exposure_user_input.call_args[0][1]
+    assert [f["path"] for f in linked] == ["/a"]
 
 
 def test_a_typed_url_attached_to_a_base_url_makes_no_user_input():

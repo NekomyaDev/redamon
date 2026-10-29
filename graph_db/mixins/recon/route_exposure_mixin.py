@@ -218,3 +218,30 @@ class RouteExposureMixin:
             props=props, jev_props=jev_props, path=path, method=method, baseurl=baseurl,
             attach_endpoint=attach_endpoint, user_id=user_id, project_id=project_id,
         )
+
+    def link_route_exposure_user_input(self, user_input_id: str, findings: list,
+                                       user_id: str, project_id: str) -> int:
+        """UserInput -[:PRODUCED]-> the Vulnerability each finding was written to.
+
+        The partial run deletes a UserInput with no PRODUCED edge as an orphan,
+        so without these the URLs an operator typed leave no trace. Returns the
+        number of findings linked.
+        """
+        ids = sorted({
+            _vuln_id(user_id, project_id, f["baseurl"], f.get("path") or "/",
+                     (f.get("http_method") or "GET").upper(), f["exposure_kind"])
+            for f in findings if f.get("baseurl") and f.get("exposure_kind")
+        })
+        if not ids:
+            return 0
+        with self.driver.session() as session:
+            session.run(
+                """
+                MATCH (ui:UserInput {id: $ui_id, user_id: $user_id, project_id: $project_id})
+                UNWIND $ids AS vid
+                MATCH (v:Vulnerability {id: vid, user_id: $user_id, project_id: $project_id})
+                MERGE (ui)-[:PRODUCED]->(v)
+                """,
+                ui_id=user_input_id, ids=ids, user_id=user_id, project_id=project_id,
+            )
+        return len(ids)

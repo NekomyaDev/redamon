@@ -134,21 +134,25 @@ def run_route_exposure_partial(config: dict) -> None:
     with Neo4jClient() as graph_client:
         graph_client.update_graph_from_route_exposure(recon_data, user_id, project_id)
         if user_urls:
-            _link_user_urls(graph_client, user_urls, url_attach_to, roots, user_id, project_id)
+            findings = (recon_data.get("route_exposure") or {}).get("findings") or []
+            _link_user_urls(graph_client, user_urls, url_attach_to, roots, user_id, project_id, findings)
 
     summary = (recon_data.get("route_exposure") or {}).get("summary") or {}
     print(f"\n[+][Partial Recon][RouteExposure] {summary.get('candidates', 0)} lead(s), "
           f"{summary.get('findings', 0)} signature finding(s).")
 
 
-def _link_user_urls(graph_client, user_urls, url_attach_to, roots, user_id, project_id):
-    """Attach typed URLs to an existing BaseURL, or record them on a UserInput node."""
+def _link_user_urls(graph_client, user_urls, url_attach_to, roots, user_id, project_id, findings=()):
+    """Attach typed URLs to an existing BaseURL, or record them on a UserInput node
+    that PRODUCED the findings on their base URLs."""
     import uuid
 
     if url_attach_to:
         print(f"[*][Partial Recon][RouteExposure] Linking {len(user_urls)} URL(s) to an existing BaseURL")
         return
 
+    typed_bases = {f"{p.scheme}://{p.netloc}" for p in map(urlparse, user_urls)}
+    produced = [f for f in findings if f.get("baseurl") in typed_bases]
     user_input_id = f"userinput-route-exposure-{uuid.uuid4().hex[:12]}"
     try:
         graph_client.create_user_input_node(
@@ -163,6 +167,9 @@ def _link_user_urls(graph_client, user_urls, url_attach_to, roots, user_id, proj
             project_id=project_id,
             root_orgs=root_orgs(roots),
         )
-        print(f"[*][Partial Recon][RouteExposure] Created UserInput node for {len(user_urls)} URL(s)")
+        linked = graph_client.link_route_exposure_user_input(user_input_id, produced, user_id, project_id)
+        graph_client.update_user_input_status(user_input_id, "completed", {"findings": linked})
+        print(f"[*][Partial Recon][RouteExposure] Created UserInput node for {len(user_urls)} URL(s), "
+              f"PRODUCED {linked} finding(s)")
     except Exception as e:  # noqa: BLE001
-        print(f"[!][Partial Recon][RouteExposure] Failed to create UserInput node ({type(e).__name__})")
+        print(f"[!][Partial Recon][RouteExposure] Failed to record the UserInput node ({type(e).__name__})")

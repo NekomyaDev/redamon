@@ -205,6 +205,24 @@ class TestEndpointWrites(unittest.TestCase):
         self.assertEqual(h.update_graph_from_route_exposure({}, "u", "p")["errors"], [])
 
 
+class TestUserInputLink(unittest.TestCase):
+    def test_links_the_node_each_finding_was_written_to(self):
+        h = _Harness()
+        findings = [_finding(), _finding(path="/.env", exposure_kind="env_file")]
+        self.assertEqual(h.link_route_exposure_user_input("ui-1", findings, "u1", "p1"), 2)
+        [(query, params)] = h.driver.calls
+        self.assertIn("MERGE (ui)-[:PRODUCED]->(v)", query)
+        self.assertIn("{id: $ui_id, user_id: $user_id, project_id: $project_id}", query)
+        self.assertIn("{id: vid, user_id: $user_id, project_id: $project_id}", query)
+        self.assertEqual(params["ids"], sorted(
+            _vuln_id("u1", "p1", BASE, f["path"], "GET", f["exposure_kind"]) for f in findings))
+
+    def test_no_findings_writes_nothing(self):
+        h = _Harness()
+        self.assertEqual(h.link_route_exposure_user_input("ui-1", [], "u1", "p1"), 0)
+        self.assertEqual(h.driver.calls, [])
+
+
 class TestReachable(unittest.TestCase):
     def test_reachable_from_recon_mixin(self):
         sys.modules.setdefault("neo4j", MagicMock())
