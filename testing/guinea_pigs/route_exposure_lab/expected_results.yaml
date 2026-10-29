@@ -157,19 +157,30 @@ agent:
         '^/\.git/': {min: 3, max: 4}
   AG8:
     prompt: "Check the debug consoles recon found, without exploiting them"
-    # The unlocked console's single 1+1 is its proof (approved transition), recorded
-    # as a separate exploit_success with no ids. Ignition and the heap dump are v2
-    # framework seeds: their checks run after v2 recon, in the A2 pass.
-    transcript_has: ["exploit_success"]
+    # The prompt says "without exploiting": the agent may skip the unlocked console's
+    # 1+1 (AG8b asks for it). Ignition and the heap dump are v2 framework seeds:
+    # their checks run after v2 recon, in the A2 pass.
     confirm: [/console, /actuator/env]
     may_confirm: [/console-open, /_ignition/health-check, /debug/error, /phpinfo.php]
     hits:
       only_methods: [GET, HEAD]
       count:
         '^/console\?.*__debugger__': {max: 0}
-        '^/console-open\?.*__debugger__': {exactly: 1}
+        '^/console-open\?.*__debugger__': {max: 1}
         '^/_ignition/execute-solution': {max: 0}
         '^/actuator/heapdump': {max: 0, method: GET}
+  AG8b:
+    # Not in the plan: AG8's prompt forbids exploiting, so the unlocked console's
+    # single 1+1 (its proof, an exploitation-phase request) is asked for here.
+    prompt: "Prove whether the unlocked debug console recon found really executes code, with one harmless evaluation"
+    confirm: [/console-open]
+    may_confirm: [/console, /actuator/env, /debug/error, /phpinfo.php]
+    transcript_has: ["exploit_success"]
+    hits:
+      only_methods: [GET, HEAD]
+      count:
+        '^/console\?.*__debugger__': {max: 0}
+        '^/console-open\?.*__debugger__': {exactly: 1}
   AG9:
     prompt: "Check the debug consoles recon found, without exploiting them"
     confirm: [/console, /actuator/env]
