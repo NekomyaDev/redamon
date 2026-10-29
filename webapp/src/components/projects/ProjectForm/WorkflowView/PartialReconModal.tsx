@@ -27,6 +27,8 @@ interface PartialReconModalProps {
   userId?: string
   /** OpenAPI: the project's configured documents, listed with their last status. */
   openapiSources?: unknown
+  /** IP mode only: the project's addresses, the only hosts a typed URL may name. */
+  ipTargets?: string[] | null
 }
 
 // --- API key requirements per tool ---
@@ -306,12 +308,19 @@ function describeScope(scope: ProjectRoots): string {
 
 // A typed host must pass the same rule the orchestrator and the recon container
 // apply (§4.6): strictly under an enumerated scan root, one of a listed group's
-// hosts, or a scan root itself only when Root is on.
-function validateUrl(value: string, scope: ProjectRoots): string | null {
+// hosts, or a scan root itself only when Root is on. In IP mode the run's root is
+// the `ip-targets.<id>` placeholder, so the rule is theirs for IP mode instead:
+// the host is one of the project's addresses (filter_partial_user_input).
+function validateUrl(value: string, scope: ProjectRoots, ipTargets: ReadonlySet<string> | null): string | null {
   try {
     const url = new URL(value)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return `URL must use http or https: ${value}`
     if (!url.hostname) return `URL has no hostname: ${value}`
+    if (ipTargets) {
+      // URL keeps an IPv6 host's brackets; the server's urlsplit drops them.
+      const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase()
+      return ipTargets.has(host) ? null : `${host} is not one of this project's target IPs`
+    }
     if (scope.roots.length && !admitsPartialHost(scope, url.hostname)) {
       return `${url.hostname} is out of scope for this run (${describeScope(scope)})`
     }
@@ -409,6 +418,7 @@ export function PartialReconModal({
   isStarting = false,
   userId,
   openapiSources,
+  ipTargets,
 }: PartialReconModalProps) {
   const [graphInputs, setGraphInputs] = useState<GraphInputs | null>(null)
   // The saved project's scope groups: what the orchestrator judges typed input by.
@@ -631,9 +641,13 @@ export function PartialReconModal({
   )
 
   // URL validation (resource enum tools: Katana, Hakrawler) -- must be in project scope
+  const ipTargetSet = useMemo(
+    () => ipTargets ? new Set(ipTargets.map(ip => ip.trim().toLowerCase())) : null,
+    [ipTargets],
+  )
   const urlValidation = useMemo(
-    () => validateLines(customUrls, v => validateUrl(v, partialScope)),
-    [customUrls, partialScope],
+    () => validateLines(customUrls, v => validateUrl(v, partialScope, ipTargetSet)),
+    [customUrls, partialScope, ipTargetSet],
   )
 
   const hasValidationErrors = (hasSubdomainInput && subdomainValidation.errors.length > 0)

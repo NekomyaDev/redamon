@@ -1467,6 +1467,7 @@ export function ProjectForm({
         isStarting={isPartialReconStarting}
         userId={userId ?? undefined}
         openapiSources={formData.openapiSources}
+        ipTargets={formData.ipMode ? formData.targetIps : null}
       />
 
       {/* Partial Recon Logs Drawer */}
