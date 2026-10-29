@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [7.5.0] - 2026-10-29
+
+Route exposure findings the agent can confirm, skills up to 500 KB, and errors that say why.
 
 ### Added
 
@@ -16,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Agent and chat skills up to 500 KB.** Upload, edit, community import and Generate with AI accept a skill text of up to 500 KB (512,000 characters) for both Agent Skills and Chat Skills, and the plugin SDK's local validator follows. A chosen skill's whole text enters the agent's prompt on every turn, so a skill near the limit (about 125k tokens) can exceed a smaller model's context window. An upload batch stays at 8 MB, so large files go in smaller batches.
-  - **Upgrade.** Rebuild `agent` and `webapp`.
+- **Agent and chat skills up to 500 KB** (was 50 KB). A skill near the limit is about 125k tokens of the agent's prompt. Rebuild `agent` and `webapp`.
+- **Errors say why.** A failure shows its cause as a code and HTTP status, for example "Failed to load users (P2024 · HTTP 500)", never the raw exception text, and a scan's status reads "unavailable" instead of a false "idle". Rebuild `agent` and `webapp`, restart `recon-orchestrator`.
+- **Uploads up to 60 MB**, as nginx allows (Next.js cut them at 10 MB). A project import is capped at 55 MB; FFuf and JS recon uploads need a saved project.
 - **Access Control and Path Traversal keep values out of the conversation and leave accounts alone, on every project.** Both skills now prove a finding with derived facts (status, size, key names, counts, hash prefixes) and keep a body, a secret or a cookie in a file in the Kali sandbox, unless the Rules of Engagement allow full access to sensitive data. In the informational phase they send read-only requests and never a logout, password reset or delete route; in the exploitation phase a write touches only an object the tester owns. Before, the Rules of Engagement said "do not display sensitive data" without saying how to prove a finding that way, and a session printed records, a password and a session cookie.
   - **Upgrade.** Rebuild `agent`.
 
@@ -28,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings numbers.** Emptying a numeric setting and leaving the field restores its default, instead of saving 0 (which the save refused for most fields, and which meant "off" for some).
 - **Red Zone tables on a phone.** The toolbar wraps, so the Markdown export and the Filters menu are reachable on a narrow screen.
 - **Partial recon in IP mode.** A typed URL on one of the project's own addresses is accepted; the modal refused every typed URL as out of scope.
+- **Global Settings could erase stored API keys** when the page failed to load; Save now waits for a successful load.
+- **False successes.** GVM pause/stop, deleting a report, chat skill or provider, TrafficMind apply, MCP save and AI Gauntlet stop report their failures; the AI drawer stops after five reconnects, and a failed activation check releases its lock.
+
+### Security
+
+- **Wordlists and MCP tokens.** The wordlist routes now check that the project is the caller's (any signed-in user could read or delete another user's wordlists), and deleting an MCP server no longer returns the saved tokens unmasked.
 
 ## [7.4.0] - 2026-10-27
 
