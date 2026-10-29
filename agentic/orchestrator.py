@@ -39,6 +39,7 @@ from orchestrator_helpers.llm_setup import setup_llm, apply_project_settings
 from agent_context import current_llm
 from prompt_safety import fence_node_context
 from orchestrator_helpers.streaming import clear_stale_streaming_state, emit_streaming_events
+from orchestrator_helpers.body_sweep import sweep_session_bodies
 from orchestrator_helpers.nodes import (
     initialize_node,
     think_node,
@@ -623,6 +624,7 @@ class AgentOrchestrator:
             return await execute_plan_node(state, config, tool_executor=self.tool_executor, streaming_callbacks=self._streaming_callbacks, session_manager_base=_SESSION_MANAGER_BASE, graph_view_cyphers=self._graph_view_cyphers)
 
         async def _await_approval(state, config=None):
+            await sweep_session_bodies(self.tool_executor, state)
             return await await_approval_node(state, config)
 
         async def _process_approval(state, config=None):
@@ -635,6 +637,7 @@ class AgentOrchestrator:
             return await process_answer_node(state, config)
 
         async def _generate_response(state, config=None):
+            await sweep_session_bodies(self.tool_executor, state)
             return await generate_response_node(state, config, llm=(current_llm.get() or self.llm), streaming_callbacks=self._streaming_callbacks, neo4j_creds=neo4j_creds)
 
         async def _await_tool_confirmation(state, config=None):
