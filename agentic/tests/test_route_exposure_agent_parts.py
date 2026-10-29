@@ -269,4 +269,6 @@ def test_the_console_evaluation_is_one_request_and_no_retry():
     # A live run retried the evaluation seven times, with POSTs.
     flat = " ".join(_new_parts()["consoles"].split())
     assert "It is exactly ONE GET: never a POST, an OPTIONS or a retry" in flat
+    assert "no method-support probe before or after it" in flat
     assert "evaluation unconfirmed and stop there" in flat
+    assert "Never send a POST or an OPTIONS to any of them, not even to probe" in flat
