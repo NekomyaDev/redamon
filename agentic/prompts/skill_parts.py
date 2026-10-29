@@ -101,6 +101,9 @@ _SPECS = (
      ("path_traversal_archive_extraction_enabled", "path_traversal_oob_callback_enabled",
       "path_traversal_oob_provider", "path_traversal_payload_reference_enabled",
       "path_traversal_php_wrappers_enabled", "path_traversal_request_timeout"), _ALWAYS),
+    ("path_traversal", "safe_values", "safe_handling_prompts.PATH_TRAVERSAL_SAFE_VALUES", PLAIN, (),
+     "ROE_SENSITIVE_DATA_HANDLING not full_access"),
+    ("path_traversal", "safe_state", "safe_handling_prompts.PATH_TRAVERSAL_SAFE_STATE", PLAIN, (), _ALWAYS),
     ("path_traversal", "php_wrappers", "path_traversal_prompts.PATH_TRAVERSAL_PHP_WRAPPERS", PLAIN, (),
      "PATH_TRAVERSAL_PHP_WRAPPERS_ENABLED"),
     ("path_traversal", "oob_workflow", "path_traversal_prompts.PATH_TRAVERSAL_OOB_WORKFLOW", PLAIN, (),
@@ -156,6 +159,9 @@ _SPECS = (
      PLAIN, (), "stateless mode and a Metasploit search returned no module"),
 
     ("access_control", "tools", "access_control_prompts.ACCESS_CONTROL_TOOLS", PLAIN, (), _ALWAYS),
+    ("access_control", "safe_values", "safe_handling_prompts.ACCESS_CONTROL_SAFE_VALUES", PLAIN, (),
+     "ROE_SENSITIVE_DATA_HANDLING not full_access"),
+    ("access_control", "safe_state", "safe_handling_prompts.ACCESS_CONTROL_SAFE_STATE", PLAIN, (), _ALWAYS),
     ("access_control", "route_exposure_leads", "access_control_prompts.ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS",
      PLAIN, (), "ROUTE_EXPOSURE_ENABLED"),
 

@@ -37,6 +37,8 @@ EXPECTED = [
     ("ssrf", "dns_rebinding", "plain"),
     ("ssrf", "payload_reference", "plain"),
     ("path_traversal", "tools", "template"),
+    ("path_traversal", "safe_values", "plain"),
+    ("path_traversal", "safe_state", "plain"),
     ("path_traversal", "php_wrappers", "plain"),
     ("path_traversal", "oob_workflow", "plain"),
     ("path_traversal", "archive_extraction", "plain"),
@@ -62,6 +64,8 @@ EXPECTED = [
     ("cve_exploit", "no_module_fallback_statefull", "plain"),
     ("cve_exploit", "no_module_fallback_stateless", "plain"),
     ("access_control", "tools", "plain"),
+    ("access_control", "safe_values", "plain"),
+    ("access_control", "safe_state", "plain"),
     ("access_control", "route_exposure_leads", "plain"),
     ("http_request_smuggling", "tools", "plain"),
     ("http_request_smuggling", "zero_cl_step", "plain"),
@@ -110,7 +114,7 @@ def _resolve(constant: str):
 def test_parts_and_order_are_the_published_list():
     got = [(p.skill_id, p.part_id, p.kind) for p in skill_parts.all_parts()]
     assert got == EXPECTED
-    assert len(got) == 53
+    assert len(got) == 57
 
 
 def test_text_is_the_module_constant_itself():

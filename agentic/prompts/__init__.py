@@ -142,6 +142,12 @@ from .unclassified_prompts import UNCLASSIFIED_EXPLOIT_TOOLS
 
 # Re-export from Broken Access Control / Authorization Bypass prompts
 from .access_control_prompts import ACCESS_CONTROL_TOOLS, ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS
+from .safe_handling_prompts import (
+    ACCESS_CONTROL_SAFE_STATE,
+    ACCESS_CONTROL_SAFE_VALUES,
+    PATH_TRAVERSAL_SAFE_STATE,
+    PATH_TRAVERSAL_SAFE_VALUES,
+)
 
 # Re-export from post-exploitation prompts
 from .post_exploitation import (
@@ -402,6 +408,11 @@ def _build_builtin_skill_workflow_parts(
         }
         parts.append(_seam.resolve_skill_part(
             "path_traversal", "tools", PATH_TRAVERSAL_TOOLS, pt_settings))
+        if get_setting('ROE_SENSITIVE_DATA_HANDLING', 'no_access') != 'full_access':
+            parts.append(_seam.resolve_skill_part(
+                "path_traversal", "safe_values", PATH_TRAVERSAL_SAFE_VALUES))
+        parts.append(_seam.resolve_skill_part(
+            "path_traversal", "safe_state", PATH_TRAVERSAL_SAFE_STATE))
         if pt_php_enabled:
             parts.append(_seam.resolve_skill_part(
                 "path_traversal", "php_wrappers", PATH_TRAVERSAL_PHP_WRAPPERS))
@@ -491,6 +502,11 @@ def _build_builtin_skill_workflow_parts(
             and "access_control" in enabled_builtins
             and "execute_curl" in allowed_tools):
         parts.append(_seam.resolve_skill_part("access_control", "tools", ACCESS_CONTROL_TOOLS))
+        if get_setting('ROE_SENSITIVE_DATA_HANDLING', 'no_access') != 'full_access':
+            parts.append(_seam.resolve_skill_part(
+                "access_control", "safe_values", ACCESS_CONTROL_SAFE_VALUES))
+        parts.append(_seam.resolve_skill_part(
+            "access_control", "safe_state", ACCESS_CONTROL_SAFE_STATE))
         if get_setting('ROUTE_EXPOSURE_ENABLED', False):
             parts.append(_seam.resolve_skill_part(
                 "access_control", "route_exposure_leads", ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS))
@@ -828,6 +844,10 @@ __all__ = [
     "UNCLASSIFIED_EXPLOIT_TOOLS",
     "ACCESS_CONTROL_TOOLS",
     "ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS",
+    "ACCESS_CONTROL_SAFE_VALUES",
+    "ACCESS_CONTROL_SAFE_STATE",
+    "PATH_TRAVERSAL_SAFE_VALUES",
+    "PATH_TRAVERSAL_SAFE_STATE",
     "HTTP_SMUGGLING_TOOLS",
     "HTTP_SMUGGLING_ZERO_CL_STEP",
     "HTTP_SMUGGLING_EXPECT_STEP",
