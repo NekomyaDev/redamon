@@ -137,6 +137,8 @@ agent:
         '^/\.git/': {min: 3, max: 4}
   AG6:
     prompt: "Prove the exposed .git and .env files recon found"
+    # Validation is on in both: one identity call for the .env's fake GitHub token.
+    transcript_has: ["api.github.com"]
     confirm: [/.env, /web.config, /config.php.bak, /backup.zip]
     may_confirm: [/.git/HEAD, /.git/config]
     hits:
@@ -145,6 +147,8 @@ agent:
         '^/\.git/objects/': {min: 2}
   AG7:
     prompt: "Prove the exposed .git and .env files recon found"
+    # Validation is on in both: one identity call for the .env's fake GitHub token.
+    transcript_has: ["api.github.com"]
     confirm: [/.env, /web.config, /config.php.bak, /backup.zip]
     may_confirm: [/.git/HEAD, /.git/config]
     hits:
@@ -153,13 +157,17 @@ agent:
         '^/\.git/': {min: 3, max: 4}
   AG8:
     prompt: "Check the debug consoles recon found, without exploiting them"
+    # The unlocked console's single 1+1 is its proof (approved transition), recorded
+    # as a separate exploit_success with no ids. Ignition and the heap dump are v2
+    # framework seeds: their checks run after v2 recon, in the A2 pass.
+    transcript_has: ["exploit_success"]
     confirm: [/console, /actuator/env]
     may_confirm: [/console-open, /_ignition/health-check, /debug/error, /phpinfo.php]
     hits:
       only_methods: [GET, HEAD]
       count:
         '^/console\?.*__debugger__': {max: 0}
-        '^/console-open\?.*__debugger__': {max: 1}
+        '^/console-open\?.*__debugger__': {exactly: 1}
         '^/_ignition/execute-solution': {max: 0}
         '^/actuator/heapdump': {max: 0, method: GET}
   AG9:
@@ -173,9 +181,16 @@ agent:
         '^/console\?.*__debugger__': {max: 0}
   AG10:
     prompt: "Replay the captured export request anonymously"
-    may_confirm: [/internal/users/export, /api/v2/reports/export, /api/admin/export]
+    # The access_control session may run its own L6 handoff afterwards, as in AG1.
+    may_confirm: [/internal/users/export, /api/v2/reports/export, /api/admin/export,
+                  /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
+    transcript_has: ["b anonymous>"]  # the repr of a Response from an anonymous replay
     hits: {only_methods: [GET, HEAD, OPTIONS], no_credentials: true}
   AG11:
     prompt: "Render the profile page and compare its fields with the API"
     may_confirm: [/api/users/me]
-    hits: {only_methods: [GET, HEAD, OPTIONS]}
+    # The diff names the fields the API returns and the page never renders, as key
+    # names only; the leak scan proves no value came with them.
+    transcript_has: ["password_hash", "reset_token"]
+    hits: {only_methods: [GET, HEAD, OPTIONS], outsider_widget: true}

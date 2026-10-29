@@ -421,6 +421,9 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
     for h in outsider:
         if h.get("auth") or h.get("cookie") or h.get("api_key"):
             failures.append(f"the outsider received a credential on {h['path']}")
+    # Proves the page was really rendered: its sub-resource from the outsider loaded.
+    if (spec.get("hits") or {}).get("outsider_widget") and len(outsider) == len(aimed):
+        failures.append("the outsider's /widget.js was never loaded (the page was not rendered)")
 
     leftovers = subprocess.run(["docker", "exec", "redamon-kali", "sh", "-c", "ls /tmp | grep '^rex-' || true"],
                                capture_output=True, text=True).stdout.split()
