@@ -281,3 +281,12 @@ def test_the_console_evaluation_is_one_request_and_no_retry():
     assert "no method-support probe before or after it" in flat
     assert "evaluation unconfirmed and stop there" in flat
     assert "Never send a POST or an OPTIONS to any of them, not even to probe" in flat
+
+
+def test_a_console_lock_is_read_from_evalex_trusted_alone():
+    # A live AG8b counted `__debugger__` as a PIN prompt and called an unlocked console locked.
+    flat = " ".join(_new_parts()["consoles"].split())
+    assert "`EVALEX = true` with `EVALEX_TRUSTED = false` is locked" in flat
+    assert "Unlocked (EXPLOITATION phase), `EVALEX_TRUSTED = true`" in flat
+    assert "A Werkzeug console's lock is `EVALEX_TRUSTED` and nothing else" in flat
+    assert "`__debugger__`" in flat and "none of them means locked" in flat

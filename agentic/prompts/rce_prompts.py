@@ -1286,12 +1286,16 @@ is not part of the proof.
 
 | Signature | Recipe | Proof | Never |
 | --- | --- | --- | --- |
-| Werkzeug debugger | curl the console page into a file; the script checks `EVALEX = true` and whether a PIN prompt is present | locked: report "PIN-protected console" (exposed; the exploit is not attempted). Unlocked (EXPLOITATION phase): ONE request evaluating `1+1` with the page's `SECRET` and `frm`, whose answer contains `2` | guess or compute a PIN; evaluate anything but `1+1` |
+| Werkzeug debugger | curl the console page into a file; the script reads `EVALEX` and `EVALEX_TRUSTED` from the page's script block | `EVALEX = true` with `EVALEX_TRUSTED = false` is locked (it asks for a PIN): report "PIN-protected console" (exposed; the exploit is not attempted). Unlocked (EXPLOITATION phase), `EVALEX_TRUSTED = true`: ONE request evaluating `1+1` with the page's `SECRET` and `frm`, whose answer contains `2` | guess or compute a PIN; evaluate anything but `1+1` |
 | Laravel Ignition | `GET /_ignition/health-check` | `"can_execute_commands": true`, plus the Ignition version when shown: "CVE-2021-3129 applicable" | POST `/_ignition/execute-solution`; any log-clear or phar chain |
 | Symfony profiler | `GET /_profiler/latest` into a file | the profiler token page | follow a link to phpinfo with credentials |
 | actuator env | curl `/actuator/env` into a file; the script counts property sources and the keys whose value is not masked (`******`) and looks secret | the counts | POST to `/actuator/env`, `/refresh`, `/restart`, `/shutdown`, or any jolokia URL |
 | actuator heapdump | `HEAD /actuator/heapdump` | 200, octet-stream and a size | GET it, unless heapdump analysis is ENABLED |
 | pprof / server-status | GET the index into a file | the signature | none |
+
+A Werkzeug console's lock is `EVALEX_TRUSTED` and nothing else: `__debugger__`, the
+word "console" and the PIN form's markup appear on unlocked pages too, so none of
+them means locked.
 
 The unlocked console's `1+1` is its proof, and it needs the EXPLOITATION phase: from
 the informational phase, record the other proofs first, then request
