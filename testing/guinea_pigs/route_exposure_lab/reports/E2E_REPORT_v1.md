@@ -187,6 +187,25 @@ Every cell of [`../ui_checklist.md`](../ui_checklist.md) is ticked, apart from t
 
 Screenshots are in `screenshots/v1/` (gitignored).
 
+### 5.1 Addendum: reading the new properties (after v1)
+
+Added on request after the v1 pass (`5d64a727`, `0644cf38`), checked on the live stack with
+the AG project's graph after an agent session had confirmed its leads:
+- **Node drawer.** A route exposure Vulnerability gets a "Route exposure" block of labelled rows
+  (exposure, status, route class, route, both answers, body comparison, why a login is expected,
+  leaks, personal data, sensitive fields, signature, generator, catch-all check, confidence,
+  evidence). The status reads the lead's CONFIRMS edge from the loaded graph: `/api/users/me`
+  showed "Confirmed by the agent". An Endpoint the scan measured shows its anonymous answer.
+- **Node Inspector.** The same block leads the expanded row. In the first check it sat after
+  Properties and started off-screen, because a 36-column table stretches the row past the
+  viewport; it now comes first (`0644cf38`). `/api/v2/reports/export` read "Confirmed by the agent".
+- **Mute Rules.** The Route exposure kind offers 14 more fields (host, URL, path, method,
+  logged-in status, same page logged in, anonymous body type, login expected because, leak
+  signals, personal data types, sensitive fields, signature, catch-all check) after the existing
+  ones; a draft rule was discarded, nothing saved.
+
+Screenshots: `screenshots/v1/display_drawer.png`, `screenshots/v1/display_node_inspector.png`.
+
 ## 6. Pass history
 
 Sections 3 to 5 ran as one consecutive pass on `9d37d2f0`, after the last code change. The scenario matrix (S1-S11, S9, S12, S13, S14, S21) had also passed in full on `c1fde9ff`. The four fixes after it (`9999a94d`, `a4938e6f`, `c6ca8c6c`, `9d37d2f0`) came from the partial and layout checks, and the whole pass was repeated after the last of them.
