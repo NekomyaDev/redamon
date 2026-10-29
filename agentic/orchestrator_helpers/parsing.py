@@ -233,6 +233,18 @@ def try_parse_llm_decision(response_text: str) -> Tuple[Optional[LLMDecision], O
             extracted = data["output_analysis"]["extracted_info"]
             _normalize_extracted_info(extracted)
 
+        # chain_findings is a field OF output_analysis, but a model analysing a
+        # single tool's output often puts it beside output_analysis (the prompt's
+        # example for that case shows it as a separate fragment). LLMDecision
+        # ignores unknown top-level keys, so every finding there vanished
+        # silently, confirmations included: move it rather than drop it.
+        top_findings = data.pop("chain_findings", None)
+        if isinstance(top_findings, list) and top_findings:
+            if not isinstance(data.get("output_analysis"), dict):
+                data["output_analysis"] = {}
+            nested = data["output_analysis"].get("chain_findings")
+            data["output_analysis"]["chain_findings"] = (nested if isinstance(nested, list) else []) + top_findings
+
         # Normalize chain_findings in output_analysis
         if data.get("output_analysis") and isinstance(data["output_analysis"], dict):
             _normalize_chain_findings(data["output_analysis"])

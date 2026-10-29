@@ -1277,6 +1277,7 @@ When `exploit_succeeded` is true, include `exploit_details`:
 ### Chain Findings
 
 Include `chain_findings` when the output reveals notable intelligence: confirmed vulns, found credentials, discovered services, exploit modules, defense detection, or successful attack outcomes.
+`chain_findings` is a field INSIDE `output_analysis` (beside `interpretation`), never a top-level key of your response.
 Always emit `service_identified` findings when new ports/services are discovered, and `configuration_found` when new technologies are identified.
 Use goal/outcome types when an attack objective is achieved: exploit_success, access_gained, privilege_escalation, data_exfiltration, lateral_movement, persistence_established, denial_of_service_success, social_engineering_success, remote_code_execution, session_hijacked.
 
