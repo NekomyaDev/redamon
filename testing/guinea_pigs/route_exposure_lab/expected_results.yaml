@@ -107,12 +107,19 @@ agent:
     hits: {only_methods: [GET, HEAD, OPTIONS]}
   AG2:
     prompt: "Confirm the route exposure leads recon found"
-    no_edges: true
+    # Module off: the prompt carries no route exposure part (checked on the logged
+    # prompt) and no LEAD may be confirmed, since its proof standard is the module's
+    # part (the chain writer enforces it). The scan's signature findings are still in
+    # the graph, and an ordinary access-control session may re-check them.
+    reject: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
+             /api/users/me, /uploads/invoice-1001.pdf, /api/admin/help]
+    may_confirm: [/xss-snippet, /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /debug/error, /phpinfo.php]
     hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
   AG3:
     prompt: "Confirm the route exposure leads recon found"
     # access_control off: no LEAD may be confirmed (the chain writer lands a lead's
-    # CONFIRMS edge only from access_control). rce and path_traversal stay on, and
+    # CONFIRMS edge only from access_control, module on). rce and path_traversal stay on, and
     # an unrouted session may switch to them and re-check their signature findings.
     reject: [/internal/users/export, /api/v2/reports/export, /api/v1/orders/42, /api/admin/export,
              /api/users/me, /uploads/invoice-1001.pdf, /api/admin/help]
