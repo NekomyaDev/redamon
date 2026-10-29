@@ -16,6 +16,23 @@ interface RouteExposureSectionProps {
   onRun?: () => void
   /** Opens Target & Modules, where the authentication profile is set. */
   onOpenAuth?: () => void
+  /** Opens AI Agent > Agent Skills, where Broken Access Control is turned on. */
+  onOpenAgentSkills?: () => void
+}
+
+/** A tab name inside a hint: a link when the form can switch tabs, plain text otherwise. */
+function TabLink({ onOpen, children }: { onOpen?: () => void; children: React.ReactNode }) {
+  if (!onOpen) return <>{children}</>
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{ background: 'none', border: 0, padding: 0, color: 'var(--accent-primary)',
+               fontWeight: 500, cursor: 'pointer' }}
+    >
+      {children}
+    </button>
+  )
 }
 
 /**
@@ -23,7 +40,7 @@ interface RouteExposureSectionProps {
  * recon found plus the ones it generates, anonymously and logged in, and writes
  * leads for the agent and findings a signature proves.
  */
-export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: RouteExposureSectionProps) {
+export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onOpenAgentSkills }: RouteExposureSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const enabled = !!data.routeExposureEnabled
   // Read as the agent reads it (get_enabled_builtin_skills): only a truthy value
@@ -75,7 +92,7 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: R
           {enabled && !skillOn('access_control') && (
             <p className={`${styles.fieldHint} ${styles.fieldHintCaution}`} role="alert">
               <strong>Half a cycle.</strong> Recon writes leads, but nothing confirms them: turn on Broken Access
-              Control in AI Agent &gt; Agent Skills.
+              Control in <TabLink onOpen={onOpenAgentSkills}>AI Agent &gt; Agent Skills</TabLink>.
             </p>
           )}
           {enabled && (!skillOn('path_traversal') || !skillOn('rce')) && (
@@ -169,18 +186,7 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth }: R
                 </div>
                 <p className={`${styles.fieldHint} ${styles.fieldHintCaution}`}>
                   Needs an authentication profile: set it in{' '}
-                  {onOpenAuth ? (
-                    <button
-                      type="button"
-                      onClick={onOpenAuth}
-                      style={{ background: 'none', border: 0, padding: 0, color: 'var(--accent-primary)',
-                               fontWeight: 500, cursor: 'pointer' }}
-                    >
-                      Target &amp; Modules &gt; Authentication
-                    </button>
-                  ) : (
-                    <>Target &amp; Modules &gt; Authentication</>
-                  )}
+                  <TabLink onOpen={onOpenAuth}>Target &amp; Modules &gt; Authentication</TabLink>
                   . Without one it still finds routes open to anyone.
                 </p>
               </div>

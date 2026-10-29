@@ -2,7 +2,8 @@
  * RouteExposureSection: the enable toggle, every generator and analysis toggle
  * writes its own field (falling back to the Prisma default), the authentication
  * hint links to Target & Modules, the numeric fields come from the registry, and
- * the "Half a cycle" alert reads the attack skills as the agent does.
+ * the "Half a cycle" alert reads the attack skills as the agent does and links to
+ * Agent Skills.
  *
  * Run: npx vitest run src/components/projects/ProjectForm/sections/RouteExposureSection.test.tsx
  */
@@ -96,6 +97,19 @@ describe('RouteExposureSection', () => {
     cleanup()
     renderSection({ routeExposureEnabled: false, ...skills({ access_control: false }) })
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('the alert opens AI Agent > Agent Skills', () => {
+    const onOpenAgentSkills = vi.fn()
+    renderSection({ routeExposureEnabled: true, ...skills({ access_control: false }) }, { onOpenAgentSkills })
+    fireEvent.click(screen.getByRole('button', { name: 'AI Agent > Agent Skills' }))
+    expect(onOpenAgentSkills).toHaveBeenCalled()
+  })
+
+  test('without a callback the alert names the tab as plain text', () => {
+    renderSection({ routeExposureEnabled: true, ...skills({ access_control: false }) })
+    expect(screen.getByRole('alert').textContent).toMatch(/AI Agent > Agent Skills\.$/)
+    expect(screen.queryByRole('button', { name: /Agent Skills/ })).toBeNull()
   })
 
   test.each([

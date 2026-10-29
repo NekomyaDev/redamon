@@ -1369,7 +1369,7 @@ export function ProjectForm({
             <VhostSniSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('VhostSni') : undefined} />
             <GraphqlScanSection data={formData} updateField={updateField} projectId={projectId} mode={mode} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('GraphqlScan') : undefined} />
             <WebCachePoisonSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('WebCachePoison') : undefined} />
-            <RouteExposureSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('RouteExposure') : undefined} onOpenAuth={() => setActiveTab('target')} />
+            <RouteExposureSection data={formData} updateField={updateField} onRun={mode === 'edit' && projectId ? () => setPartialReconToolId('RouteExposure') : undefined} onOpenAuth={() => setActiveTab('target')} onOpenAgentSkills={() => setActiveTab('attack')} />
           </>
         )}
 
