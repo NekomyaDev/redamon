@@ -1231,6 +1231,8 @@ each, recorded against its id. Values stay in kali files, always.
 **Pull them**, version control first:
 """ + _candidate_query(["vcs_exposure", "env_file", "config_file", "backup_file", "secret_in_response"],
                        pending=False) + """
+A request about exposed files covers every finding this pull returns, whichever kinds
+it names: prove each one, not only the `.git` or `.env` the request mentions.
 
 **Minimal proofs** (always allowed):
 
@@ -1283,6 +1285,10 @@ stays in kali under `/tmp/rex-git-<id>/`.
    cannot see kali's /tmp).
 4. Evidence: the object count, the file count, the secret counts by rule, and the
    head commit's hash prefix. Nothing else.
+
+The reconstructed tree is never printed: no file and no line of it reaches this
+conversation, not even to review the source. A review script prints file names,
+sizes and the counts of named patterns only, before the tree is deleted.
 
 There is no git-dumper in the sandbox, and never `git clone` the URL: a
 misconfigured `.git` does not serve `info/refs`, so it fails anyway.

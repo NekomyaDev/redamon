@@ -251,3 +251,22 @@ def test_the_ui_diff_is_a_real_render():
     text = _new_parts()["leads"]
     assert "`b = redamon.browser(<id of a" in text and "`b.goto('<page path>')`" in text
     assert "A curl of the page is not a render" in text
+
+
+def test_an_exposed_files_request_covers_the_whole_pull():
+    # A live AG5 proved only the .git and .env the prompt named.
+    assert "covers every finding this pull returns" in _new_parts()["exposed_files"]
+
+
+def test_the_reconstructed_tree_is_never_printed():
+    # A live AG6 "reviewed the source" by printing every recovered file.
+    flat = " ".join(_new_parts()["git"].split())
+    assert "The reconstructed tree is never printed" in flat
+    assert "not even to review the source" in flat
+
+
+def test_the_console_evaluation_is_one_request_and_no_retry():
+    # A live run retried the evaluation seven times, with POSTs.
+    flat = " ".join(_new_parts()["consoles"].split())
+    assert "It is exactly ONE GET: never a POST, an OPTIONS or a retry" in flat
+    assert "evaluation unconfirmed and stop there" in flat

@@ -1291,6 +1291,9 @@ Prove each console's real state and each endpoint's exposure, without exploiting
 The unlocked console's `1+1` is its proof, and it needs the EXPLOITATION phase: from
 the informational phase, record the other proofs first, then request
 `transition_phase` naming that one request, and send it once the operator approves.
+It is exactly ONE GET: never a POST, an OPTIONS or a retry with other parameters. If
+that one answer does not contain `2`, record the console as unlocked with the
+evaluation unconfirmed and stop there.
 
 Record each with `vulnerability_confirmed` and its id. The `1+1` output is a SEPARATE
 `exploit_success` entry with NO ids. Further exploitation follows this skill's own
