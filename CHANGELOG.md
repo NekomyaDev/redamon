@@ -18,9 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Agent and chat skills up to 500 KB.** Upload, edit, community import and Generate with AI accept a skill text of up to 500 KB (512,000 characters) for both Agent Skills and Chat Skills, and the plugin SDK's local validator follows. A chosen skill's whole text enters the agent's prompt on every turn, so a skill near the limit (about 125k tokens) can exceed a smaller model's context window. An upload batch stays at 8 MB, so large files go in smaller batches.
   - **Upgrade.** Rebuild `agent` and `webapp`.
+- **Access Control and Path Traversal keep values out of the conversation and leave accounts alone, on every project.** Both skills now prove a finding with derived facts (status, size, key names, counts, hash prefixes) and keep a body, a secret or a cookie in a file in the Kali sandbox, unless the Rules of Engagement allow full access to sensitive data. In the informational phase they send read-only requests and never a logout, password reset or delete route; in the exploitation phase a write touches only an object the tester owns. Before, the Rules of Engagement said "do not display sensitive data" without saying how to prove a finding that way, and a session printed records, a password and a session cookie.
+  - **Upgrade.** Rebuild `agent`.
 
 ### Fixed
 
+- **A lead is confirmed only by Access Control.** With Access Control off, another skill could confirm the route exposure scan's leads on a plain 200 answer, a public-by-design route included, and move them to T1; their confirmation now lands only from Access Control. Rebuild `agent`.
+- **Lost agent confirmations.** A proof the model wrote next to its output analysis instead of inside it was dropped without a trace; it is now recorded. Rebuild `agent`.
 - **Settings numbers.** Emptying a numeric setting and leaving the field restores its default, instead of saving 0 (which the save refused for most fields, and which meant "off" for some).
 - **Red Zone tables on a phone.** The toolbar wraps, so the Markdown export and the Filters menu are reachable on a narrow screen.
 - **Partial recon in IP mode.** A typed URL on one of the project's own addresses is accepted; the modal refused every typed URL as out of scope.
