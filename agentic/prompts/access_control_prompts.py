@@ -522,7 +522,7 @@ says "Auth headers NOT attached", the comparison is anonymous-only: say so.
 | --- | --- | --- |
 | internal_api, admin_function, debug_management, data_export | the anonymous 2xx returns the SAME protected content as the logged-in GET (equal body hash, or the same sensitive key paths) AND one of: the lead's `expected` holds openapi, siblings_locked, version_locked or vary_auth; sensitive key paths; 3 or more other people's identities | public by design (health, status, version, docs, public catalogue, marketing JSON, login, help), or nothing sensitive in the anonymous answer |
 | old_version | the pair on the variant AND on its `variant_of`: the newer route denies anonymously, the older one returns the same resource | the old version returns only public data |
-| uploaded_content | an anonymous GET (or HEAD, or `Range: bytes=0-0` for a large file) returns a file a logged-in page links to | the file is a public asset |
+| uploaded_content | an anonymous GET (or HEAD, or `Range: bytes=0-0` for a large file) returns the file, AND a logged-in page links to it: fetch the site root anonymously and with `use_session=true` (bodies to files) and count the file's path in each with execute_code; it appears in the logged-in body only | the file is a public asset: the anonymous root links it too |
 | kind sensitive_data (any class) | the logged-in body carries sensitive key paths, OR 3 or more records whose identifier hashes differ from the session's own (hash the identifier fields of a /me-style route the same way and print only the hash prefix) | only the session's own record and no sensitive key path |
 
 **L4. UI-vs-API diff** (EXPLOITATION phase only, excessive data). proxy_brain's

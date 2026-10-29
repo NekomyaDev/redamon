@@ -66,6 +66,9 @@ RECORD_CONTRACT = """
   (it is a field, not a tool): `finding_type: "vulnerability_confirmed"`,
   `related_finding_ids: ["<the exact id>"]`, `confidence` 80 or more. Only a proof
   type at 70 or more promotes the node to T1.
+- "Record X as confirmed" written in `actionable_findings`, `thought` or `reasoning`
+  records NOTHING: it is kept as a note without an id. Only a `chain_findings` entry
+  writes the CONFIRMS edge.
 - ONE id per entry.
 - NEVER put ids on `exploit_success`, `access_gained` or `credential_found`: those
   entries are dropped from the CONFIRMS path when an exploit succeeded, so the id
@@ -73,8 +76,9 @@ RECORD_CONTRACT = """
   console's output, a credential) as its own entry with NO ids.
 - Before `action="complete"`, verify each one:
   `MATCH (cf:ChainFinding)-[:CONFIRMS]->(v:Vulnerability {id:'<ID>'}) RETURN cf.finding_type`.
-  Missing means the id was wrong (a wrong id writes nothing, silently): put the
-  entry in your current response again with the exact id.
+  Missing means the entry was never in `chain_findings` or its id was wrong (both
+  write nothing, silently): put the entry in your NEXT response's `chain_findings`
+  with the exact id, before any `switch_skill` or `transition_phase`.
 - A lead you REJECT (public by design, nothing sensitive) gets NO entry at all:
   list it in your final answer as rejected, with the reason.
 """

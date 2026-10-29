@@ -137,6 +137,10 @@ def test_main_parts_carry_the_contract(name):
     assert "IN THE SAME RESPONSE" in text
     assert "MATCH (cf:ChainFinding)-[:CONFIRMS]->(v:Vulnerability {id:'<ID>'})" in text
     assert "NEVER put ids on `exploit_success`" in text
+    # A live campaign lost a proven lead the model wrote as "Record X" in
+    # actionable_findings, so the contract says where a confirmation must go.
+    assert "records NOTHING" in text and "Only a `chain_findings` entry" in text
+    assert "before any `switch_skill` or `transition_phase`" in text
     # The rejection rule and the forbidden actions.
     assert "gets NO entry at all" in text
     for forbidden in ("never POST to any `/actuator/*` path", "springboot-env-rce-chains",
@@ -145,6 +149,15 @@ def test_main_parts_carry_the_contract(name):
     # Values stay in files, with the banned curl flags.
     assert "/tmp/rex-<id>-anon.body" in text
     assert "`-v`, `-i`, `--trace`, `-D -` and `-o -` are" in text
+
+
+def test_an_uploaded_file_is_proven_by_a_link_only_the_session_sees():
+    row = next(line for line in _new_parts()["leads"].splitlines() if line.startswith("| uploaded_content"))
+    # "A logged-in page links to it" is a check the agent runs, not a judgement:
+    # the root fetched both ways, the file's path counted in each body.
+    assert "fetch the site root anonymously and with `use_session=true`" in row
+    assert "in the logged-in body only" in row
+    assert "the anonymous root links it too" in row
 
 
 def test_the_handoff_names_only_path_traversal_and_rce():
