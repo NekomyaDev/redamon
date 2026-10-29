@@ -1520,6 +1520,84 @@
           "type": "number",
           "prop": "confidence",
           "label": "Confidence (0-1)"
+        },
+        "host": {
+          "type": "host",
+          "prop": "host",
+          "label": "Host"
+        },
+        "matched_at": {
+          "type": "url",
+          "prop": "matched_at",
+          "label": "URL"
+        },
+        "path": {
+          "type": "text",
+          "prop": "path",
+          "label": "Path"
+        },
+        "http_method": {
+          "type": "text",
+          "prop": "http_method",
+          "label": "Method"
+        },
+        "authed_status": {
+          "type": "number",
+          "prop": "authed_status",
+          "label": "Logged-in status"
+        },
+        "bodies_match": {
+          "type": "bool",
+          "prop": "bodies_match",
+          "label": "Same page logged in"
+        },
+        "anon_content_class": {
+          "type": "enum",
+          "prop": "anon_content_class",
+          "label": "Anonymous body type",
+          "values": [
+            "json",
+            "html",
+            "text",
+            "xml",
+            "binary",
+            "other"
+          ]
+        },
+        "auth_expected_by": {
+          "type": "list",
+          "prop": "auth_expected_by",
+          "label": "Login expected because"
+        },
+        "leak_signals": {
+          "type": "list",
+          "prop": "leak_signals",
+          "label": "Leak signals"
+        },
+        "pii_types": {
+          "type": "list",
+          "prop": "pii_types",
+          "label": "Personal data types"
+        },
+        "sensitive_fields": {
+          "type": "list",
+          "prop": "sensitive_fields",
+          "label": "Sensitive fields"
+        },
+        "signature": {
+          "type": "text",
+          "prop": "signature",
+          "label": "Signature"
+        },
+        "catch_all_check": {
+          "type": "enum",
+          "prop": "catch_all_check",
+          "label": "Catch-all check",
+          "values": [
+            "passed",
+            "failed",
+            "n/a"
+          ]
         }
       },
       "overlaps": [],
