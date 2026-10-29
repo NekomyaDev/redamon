@@ -7,7 +7,9 @@ fire_record_finding) into a throwaway tenant:
      candidate at T1;
   2. a `custom` finding naming another candidate lands the edge without
      promotion (the proof query's closed type list);
-  3. a made-up id writes nothing.
+  3. a made-up id writes nothing;
+  4. a lead is confirmed only from the access_control skill, while any skill
+     may record its re-check of a signature finding.
 The tenant is deleted afterwards. Self-skips unless the driver imports and a
 database answers:
 
@@ -75,23 +77,23 @@ class AgentProofPromotesTheCandidate(unittest.TestCase):
         self.driver.close()
         self.writer.close_driver()
 
-    def _candidate(self, vid, vtype="unauthenticated_endpoint"):
+    def _candidate(self, vid, vtype="unauthenticated_endpoint", lead=True):
         props = {"id": vid, "user_id": self.uid, "project_id": self.pid, "source": "route_exposure",
-                 "type": vtype, "severity": "info", "needs_agent_confirmation": True,
-                 "exposure_kind": "anonymous_access", "route_class": "admin_function",
+                 "type": vtype, "severity": "info" if lead else "high", "needs_agent_confirmation": lead,
+                 "exposure_kind": "anonymous_access" if lead else "env_file", "route_class": "admin_function",
                  "matched_at": "http://192.0.2.10/internal/users", "host": "192.0.2.10"}
         with self.driver.session() as s:
             s.run("CREATE (v:Vulnerability) SET v = $props", props=props)
         return props
 
-    def _record(self, finding_type, ids):
+    def _record(self, finding_type, ids, skill="access_control"):
         self.writer._write_finding(
             _URI, _USER, _PASSWORD,
             finding_id=f"cf-{uuid.uuid4().hex[:12]}", chain_id=self.chain, step_id=self.step,
             user_id=self.uid, project_id=self.pid, finding_type=finding_type, severity="high",
             title="Unauthenticated admin route", description="", evidence="anon 200, 12 records",
             confidence=90, phase="exploitation", iteration=1, related_cves=[], related_ips=[],
-            related_finding_ids=ids)
+            related_finding_ids=ids, skill=skill)
 
     def _confirms(self, vid):
         with self.driver.session() as s:
@@ -130,6 +132,16 @@ class AgentProofPromotesTheCandidate(unittest.TestCase):
                           u=self.uid, p=self.pid).single()["n"]
         self.assertEqual(edges, 0)
         self.assertEqual(self._confirms(real["id"]), [])
+
+    def test_only_access_control_confirms_a_lead(self):
+        lead = self._candidate(f"rex-{uuid.uuid4().hex[:16]}")
+        signature = self._candidate(f"rex-{uuid.uuid4().hex[:16]}", "exposed_env_file", lead=False)
+        for skill in ("rce", "path_traversal", "", "user_skill:x"):
+            self._record("vulnerability_confirmed", [lead["id"], signature["id"]], skill=skill)
+        self.assertEqual(self._confirms(lead["id"]), [])
+        self.assertEqual(len(self._confirms(signature["id"])), 4)
+        self._record("vulnerability_confirmed", [lead["id"]], skill="access_control")
+        self.assertEqual(self._confirms(lead["id"]), ["vulnerability_confirmed"])
 
 
 if __name__ == "__main__":

@@ -80,6 +80,9 @@ RECORD_CONTRACT = """
   records NOTHING: it is kept as a note without an id. Only a `chain_findings` entry
   writes the CONFIRMS edge.
 - ONE id per entry.
+- A lead (`needs_agent_confirmation = true`) is confirmed ONLY in the access_control
+  skill, against its proof standard: from any other skill its id writes nothing.
+  Leave such a lead alone and name it in your final answer.
 - NEVER put ids on `exploit_success`, `access_gained` or `credential_found`: those
   entries are dropped from the CONFIRMS path when an exploit succeeded, so the id
   would be lost silently. Record the confirmation first, then the impact (a

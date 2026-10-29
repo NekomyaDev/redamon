@@ -141,6 +141,9 @@ def test_main_parts_carry_the_contract(name):
     # actionable_findings, so the contract says where a confirmation must go.
     assert "records NOTHING" in text and "Only a `chain_findings` entry" in text
     assert "before any `switch_skill` or `transition_phase`" in text
+    # A live session with access_control off confirmed every lead from rce; the
+    # writer refuses that now, and the part says so before the model tries.
+    assert "confirmed ONLY in the access_control\n  skill" in text
     # The rejection rule and the forbidden actions.
     assert "gets NO entry at all" in text
     for forbidden in ("never POST to any `/actuator/*` path", "springboot-env-rce-chains",
