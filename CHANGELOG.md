@@ -39,6 +39,7 @@ Route exposure findings the agent can confirm, skills up to 500 KB, and errors t
 - **Partial recon in IP mode.** A typed URL on one of the project's own addresses is accepted; the modal refused every typed URL as out of scope.
 - **Global Settings could erase stored API keys** when the page failed to load; Save now waits for a successful load.
 - **False successes.** GVM pause/stop, deleting a report, chat skill or provider, TrafficMind apply, MCP save and AI Gauntlet stop report their failures; the AI drawer stops after five reconnects, and a failed activation check releases its lock.
+- **CVE lookup: fewer wrong CVEs, more right ones.** `HTTP/3` was looked up as a product called "http" and got CVSS 10 CVEs from 2001, and plugin CVEs landed on WordPress and TYPO3. A CVE now counts only when NVD lists the product as vulnerable at the detected version; the 20 kept are the most severe, not the oldest; nmap services also match by their CPE; an unscored CVE no longer aborts the lookup. The next full recon scan replaces the old links.
 
 ### Security
 

@@ -150,10 +150,10 @@ export const RouteExposureTable = memo(function RouteExposureTable({ projectId }
               <td><Mono>{STATUS_LABEL[r.status] ?? r.status}</Mono></td>
               <td><NumCell value={r.anonStatus} /></td>
               <td><NumCell value={r.authedStatus} /></td>
-              <td><Truncated text={r.authExpectedBy || '-'} max={40} /></td>
-              <td><Truncated text={r.leakSignals || '-'} max={40} /></td>
+              <td><Truncated text={r.authExpectedBy || '-'} max={240} /></td>
+              <td><Truncated text={r.leakSignals || '-'} max={80} /></td>
               <td><Mono>{r.generatedBy || '-'}</Mono></td>
-              <td><Truncated text={r.evidenceSnippet} max={60} /></td>
+              <td><Truncated text={r.evidenceSnippet} max={120} /></td>
               <td><UpdatedAtCell value={r.updatedAt} /></td>
               <td><MuteNodeButton name={r.url || r.path || 'route exposure finding'} graphId={r.nodeId} label="Vulnerability" /></td>
             </tr>

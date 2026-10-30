@@ -562,6 +562,13 @@ export const ViewTabs = memo(function ViewTabs({
                 <UnseenBadge count={unseenCounts?.secrets} />
               </button>
               <button
+                className={`${styles.tableDropdownItem} ${tableViewMode === 'routeExposure' ? styles.tableDropdownItemActive : ''}`}
+                onClick={() => { onTableViewModeChange?.('routeExposure'); setTableMenuOpen(false); onViewChange('table') }}
+              >
+                <DoorOpen size={12} /> Route Exposure
+                <UnseenBadge count={unseenCounts?.routeExposure} />
+              </button>
+              <button
                 className={`${styles.tableDropdownItem} ${tableViewMode === 'netInitAccess' ? styles.tableDropdownItemActive : ''}`}
                 onClick={() => { onTableViewModeChange?.('netInitAccess'); setTableMenuOpen(false); onViewChange('table') }}
               >
@@ -637,13 +644,6 @@ export const ViewTabs = memo(function ViewTabs({
               >
                 <Droplets size={12} /> Web Cache Poisoning
                 <UnseenBadge count={unseenCounts?.webCachePoison} />
-              </button>
-              <button
-                className={`${styles.tableDropdownItem} ${tableViewMode === 'routeExposure' ? styles.tableDropdownItemActive : ''}`}
-                onClick={() => { onTableViewModeChange?.('routeExposure'); setTableMenuOpen(false); onViewChange('table') }}
-              >
-                <DoorOpen size={12} /> Route Exposure
-                <UnseenBadge count={unseenCounts?.routeExposure} />
               </button>
             </div>
           )}

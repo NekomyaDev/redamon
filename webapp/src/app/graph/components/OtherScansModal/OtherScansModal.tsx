@@ -345,7 +345,6 @@ export function OtherScansModal({
             <Search size={18} className={styles.cardIcon} />
             <h3 className={styles.cardTitle}>Secret Multiscanner</h3>
             <WikiInfoButton target="Trufflehog" title="Secret Multiscanner wiki" />
-            <span className={styles.newBadge}>NEW</span>
             <StatusBadge status={trufflehogCardStatus} />
             <ScanStatusWarning errors={[trufflehogStatusError]} />
           </div>
