@@ -1251,8 +1251,11 @@ SEPARATE `credential_found` entry with NO ids (its value never written anywhere)
 - git reconstruction: {git_reconstruct}
 - secret validation: {validate_secrets}
 
-When git reconstruction is DISABLED: do not download repository objects beyond the
-four above (HEAD, config, the ref, one object). When secret validation is ENABLED:
+When git reconstruction is ENABLED: proving an exposed `.git` includes reconstructing
+it this run. After the minimal `.git` proof, request `transition_phase` to exploitation
+for the reconstruct step below; do not complete the session while the reconstruction is
+still pending. When git reconstruction is DISABLED: do not download repository objects
+beyond the four above (HEAD, config, the ref, one object). When secret validation is ENABLED:
 once a file's proof is recorded, validate every secret-shaped key it holds with the
 part below, one identity call per key, before you complete. When it is DISABLED: do
 not call any third-party API with a found secret.

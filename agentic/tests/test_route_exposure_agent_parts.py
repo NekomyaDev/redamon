@@ -238,6 +238,14 @@ def test_validation_runs_whenever_its_switch_is_on():
     assert "one identity call per key, before you complete" in text
 
 
+def test_reconstruction_is_mandatory_when_enabled():
+    # A live AG6 recorded the minimal .git proof + validation and completed without
+    # reconstructing, because the always-present block only said what DISABLED means.
+    flat = " ".join(_new_parts()["exposed_files"].split())
+    assert "When git reconstruction is ENABLED: proving an exposed `.git` includes reconstructing it this run" in flat
+    assert "do not complete the session while the reconstruction is still pending" in flat
+
+
 def test_an_anonymous_replay_uses_proxy_brain_and_prints_no_body():
     # A live AG10 re-requested the exports with curl and never exercised the replay.
     text = _new_parts()["leads"]
