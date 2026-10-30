@@ -349,3 +349,13 @@ def test_the_browser_part_finds_the_hidden_pages_in_the_graph_never_by_guessing(
     assert "MATCH (f)-[:HAS_ENDPOINT]->(page:Endpoint {endpoint_type:'route'})" in flat
     assert "Never guess a page from the API's path." in flat
     assert "go to each page from step 1" in flat
+
+
+def test_the_browser_part_makes_the_render_part_of_the_proof():
+    """REGRESSION (AG16-17, second run): with the pages found, the agent skipped the render
+    and confirmed /api/admin/stats on the anonymous / logged-in pair alone. That pair is L2's
+    proof of an anonymous API; client-side gating also needs the page that fired it."""
+    flat = " ".join(_new_parts()["browser"].split())
+    assert "Proof needs BOTH: a page rendered without the session fired the API (step 2)" in flat
+    assert "Name that page in the evidence." in flat
+    assert "without the render the lead stays unproven, so never skip step 2" in flat

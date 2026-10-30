@@ -636,7 +636,10 @@ only; never send PURGE; never reuse a buster.
 2. execute_playwright, which never carries the session: open the site root, then go to each
    page from step 1, and print, per page, only the paths of the fetch/XHR requests it fires.
 3. Each API path a page fires, and the lead's url when it is itself an API, gets the L2 pair.
-4. Proof: the API answers anonymously with the content it gives logged in.
+4. Proof needs BOTH: a page rendered without the session fired the API (step 2), AND the API
+   answers anonymously with the content it gives logged in (step 3). Name that page in the
+   evidence. The pair alone only proves an anonymous API, which is L2's finding, not this
+   one: without the render the lead stays unproven, so never skip step 2.
 5. A hidden page whose API answers 401 anonymously is NOT a finding: client-side hiding
    with server-side enforcement is correct. Record nothing for it; list it as rejected.
 
