@@ -8,10 +8,11 @@
  * Run: npx vitest run src/components/projects/ProjectForm/sections/RouteExposureSection.test.tsx
  */
 import { describe, test, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { RouteExposureSection } from './RouteExposureSection'
 
 vi.mock('../NodeInfoTooltip', () => ({ NodeInfoTooltip: () => null }))
+vi.mock('@/providers/ProjectProvider', () => ({ useProject: () => ({ userId: 'u1' }) }))
 vi.mock('../RegistryFields', () => ({
   RegistryFields: ({ keys, title }: { keys: string[]; title: string }) => (
     <div data-testid="registry-fields" data-title={title}>{keys.join(',')}</div>
@@ -25,7 +26,7 @@ vi.mock('@/components/ui', () => ({
   ),
 }))
 
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 function renderSection(data: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   const updateField = vi.fn()
@@ -59,6 +60,12 @@ describe('RouteExposureSection', () => {
     ['Older API versions', 'routeExposureVersionVariants'],
     ['Compare with the logged-in answer', 'routeExposureCompareLoggedIn'],
     ['Personal data detection', 'routeExposurePiiDetection'],
+    ['Sibling routes', 'routeExposureSiblings'],
+    ['Framework paths', 'routeExposureFrameworkSeeds'],
+    ['Follow route catalogs', 'routeExposureFollowCatalogs'],
+    ['Git walk proof', 'routeExposureGitWalk'],
+    ['Cross-origin (CORS)', 'routeExposureCorsRider'],
+    ['Cacheable logged-in content', 'routeExposureCacheRider'],
   ])('%s writes %s, on by default', (name, field) => {
     // A project saved before the field existed has no value: the control reads on.
     const { updateField } = renderSection({ routeExposureEnabled: true })
@@ -144,5 +151,47 @@ describe('RouteExposureSection', () => {
     renderSection({ routeExposureEnabled: true }, { onRun })
     fireEvent.click(screen.getByText(/Run partial recon/))
     expect(onRun).toHaveBeenCalled()
+  })
+
+  test('Cross-host writes routeExposureCrossHost, off by default', () => {
+    const { updateField } = renderSection({ routeExposureEnabled: true })
+    const toggle = screen.getByRole('switch', { name: 'Cross-host' })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(toggle)
+    expect(updateField).toHaveBeenCalledWith('routeExposureCrossHost', true)
+  })
+})
+
+describe('RouteExposureSection Jev rows', () => {
+  const FIELDS = ['routeExposureJevRank', 'routeExposureJevWallCheck', 'routeExposureJevAssess']
+
+  function stubJevProvider() {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true, status: 200,
+      json: async () => [{ id: 'j', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-1.13.0' }],
+    })))
+  }
+
+  test('each of the three controls writes its own field', async () => {
+    stubJevProvider()
+    const { updateField } = renderSection({ routeExposureEnabled: true, aiInPipeline: true })
+    const groups = screen.getAllByRole('group', { name: 'Jev hook' })
+    expect(groups).toHaveLength(3)
+    for (const [i, field] of FIELDS.entries()) {
+      const jev = within(groups[i]).getByRole('button', { name: 'Jev' })
+      await waitFor(() => expect(jev).toBeEnabled())
+      fireEvent.click(jev)
+      expect(updateField).toHaveBeenCalledWith(field, true)
+    }
+  })
+
+  test('they are disabled until AI in Pipeline is on, and say so', () => {
+    stubJevProvider()
+    renderSection({ routeExposureEnabled: true, aiInPipeline: false })
+    for (const group of screen.getAllByRole('group', { name: 'Jev hook' })) {
+      const jev = within(group).getByRole('button', { name: 'Jev' })
+      expect(jev).toBeDisabled()
+      expect(jev).toHaveAttribute('title', 'Enable "AI in Pipeline" in the Target tab to turn this on.')
+    }
   })
 })

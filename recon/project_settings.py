@@ -882,6 +882,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'ROUTE_EXPOSURE_CROSS_HOST': False,
     'ROUTE_EXPOSURE_CORS_RIDER': True,
     'ROUTE_EXPOSURE_CACHE_RIDER': True,
+    # v3 Jev-only hooks: gated at the call site with AI_IN_PIPELINE, so they stay
+    # out of apply_ai_pipeline_overrides (the master switch must not force them).
+    'ROUTE_EXPOSURE_JEV_RANK': False,
+    'ROUTE_EXPOSURE_JEV_WALL_CHECK': False,
+    'ROUTE_EXPOSURE_JEV_ASSESS': False,
 }
 
 
@@ -2287,6 +2292,9 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
     settings['ROUTE_EXPOSURE_CROSS_HOST'] = project.get('routeExposureCrossHost', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CROSS_HOST'])
     settings['ROUTE_EXPOSURE_CORS_RIDER'] = project.get('routeExposureCorsRider', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CORS_RIDER'])
     settings['ROUTE_EXPOSURE_CACHE_RIDER'] = project.get('routeExposureCacheRider', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CACHE_RIDER'])
+    settings['ROUTE_EXPOSURE_JEV_RANK'] = project.get('routeExposureJevRank', DEFAULT_SETTINGS['ROUTE_EXPOSURE_JEV_RANK'])
+    settings['ROUTE_EXPOSURE_JEV_WALL_CHECK'] = project.get('routeExposureJevWallCheck', DEFAULT_SETTINGS['ROUTE_EXPOSURE_JEV_WALL_CHECK'])
+    settings['ROUTE_EXPOSURE_JEV_ASSESS'] = project.get('routeExposureJevAssess', DEFAULT_SETTINGS['ROUTE_EXPOSURE_JEV_ASSESS'])
 
     # RoE: cap every rate the engagement ceiling applies to.
     apply_roe_rate_cap(settings)

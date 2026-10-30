@@ -106,10 +106,10 @@ export function JevProviderSection({
       <h3 id="jev-provider-title" className={styles.title}>{JEV_TYPE.name}</h3>
       <p className={styles.intro}>
         Jev answers typed questions for recon hooks. Four can run on Jev instead of the LLM: FFuf
-        extensions, Nuclei tags, WAF classification and takeover disambiguation. Five more run
+        extensions, Nuclei tags, WAF classification and takeover disambiguation. Eight more run
         only on Jev: page-type labels, FFuf base-path ranking, Hakrawler seed order, the
-        tool-health check and the serialized-object ranking. A project uses it only for the
-        hooks it sets to Jev.
+        tool-health check, the serialized-object ranking, and route exposure's route ranking,
+        login-wall check and lead assessment. A project uses it only for the hooks it sets to Jev.
         It is not a chat model and never appears in a model picker.
       </p>
       {body}

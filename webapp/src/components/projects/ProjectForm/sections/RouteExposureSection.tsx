@@ -7,6 +7,9 @@ import type { Project } from '@prisma/client'
 import styles from '../ProjectForm.module.css'
 import { NodeInfoTooltip } from '../NodeInfoTooltip'
 import { RegistryFields } from '../RegistryFields'
+import { AiToggleLabel } from '../AiToggleLabel'
+import { JevEngineControl } from '../JevEngineControl'
+import { useHasJevProvider } from '@/hooks/useHasJevProvider'
 
 type FormData = Omit<Project, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'user'>
 
@@ -43,6 +46,7 @@ function TabLink({ onOpen, children }: { onOpen?: () => void; children: React.Re
 export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onOpenAgentSkills }: RouteExposureSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const enabled = !!data.routeExposureEnabled
+  const jevStatus = useHasJevProvider()
   // Read as the agent reads it (get_enabled_builtin_skills): only a truthy value
   // is on, so a project saved before a skill existed shows the alert.
   const builtIn = (data.attackSkillConfig as { builtIn?: Record<string, unknown> } | null)?.builtIn ?? {}
@@ -315,6 +319,61 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                     checked={data.routeExposureCacheRider ?? true}
                     onChange={(c) => updateField('routeExposureCacheRider', c ?? true)}
                     aria-label="Cacheable logged-in content"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Second opinions from Jev</label>
+                <div className={styles.toggleRow} style={{ alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <AiToggleLabel
+                    label="Rank routes with Jev"
+                    tooltip={
+                      'Jev is asked, per route, whether it is meant only for logged-in, internal or administrative callers. Shadow mode: the answer is recorded next to the deterministic budget order, which does not change, and no route is ever dropped. Same switch as in the Target tab AI panel. ' +
+                      (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
+                    }
+                  />
+                  <JevEngineControl
+                    variant="jevOnly"
+                    value={data.routeExposureJevRank}
+                    enabled={data.aiInPipeline}
+                    jevStatus={jevStatus}
+                    disabledHint='Enable "AI in Pipeline" in the Target tab to turn this on.'
+                    onSelect={(on) => updateField('routeExposureJevRank', on)}
+                  />
+                </div>
+                <div className={styles.toggleRow} style={{ alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <AiToggleLabel
+                    label="Spot disguised login walls with Jev"
+                    tooltip={
+                      'For the HTML pages kept as leads, Jev is asked whether each is really a login form, an error page or a placeholder. The body reaches Jev masked. Shadow mode: recorded only, no lead changes. Same switch as in the Target tab AI panel. ' +
+                      (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
+                    }
+                  />
+                  <JevEngineControl
+                    variant="jevOnly"
+                    value={data.routeExposureJevWallCheck}
+                    enabled={data.aiInPipeline}
+                    jevStatus={jevStatus}
+                    disabledHint='Enable "AI in Pipeline" in the Target tab to turn this on.'
+                    onSelect={(on) => updateField('routeExposureJevWallCheck', on)}
+                  />
+                </div>
+                <div className={styles.toggleRow} style={{ alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <AiToggleLabel
+                    label="Assess leads with Jev"
+                    tooltip={
+                      'Jev is asked, per lead, which kind of route it is and how sensitive its answer is, from the evidence alone, never the route class or a value. Shadow mode: recorded only, no lead changes. Same switch as in the Target tab AI panel. ' +
+                      (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
+                    }
+                  />
+                  <JevEngineControl
+                    variant="jevOnly"
+                    value={data.routeExposureJevAssess}
+                    enabled={data.aiInPipeline}
+                    jevStatus={jevStatus}
+                    disabledHint='Enable "AI in Pipeline" in the Target tab to turn this on.'
+                    onSelect={(on) => updateField('routeExposureJevAssess', on)}
                   />
                 </div>
               </div>

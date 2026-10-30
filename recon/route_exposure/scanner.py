@@ -250,6 +250,52 @@ def _cross_host_routes(observations: list, corpus, combined_result: dict, cfg: d
     return made
 
 
+def _jev_rank(routes: list, settings: dict, combined_result: dict) -> None:
+    """Hook A (shadow): Jev's privacy reading of each route, recorded beside the prior
+    score's; the budget order is the deterministic one."""
+    try:
+        from recon.helpers.ai_planner import route_privacy_rank
+        route_privacy_rank.run_for_routes(routes, settings, combined_result)
+    except Exception as e:  # noqa: BLE001 - a hook never breaks the scan
+        print(f"[!][RouteExposure] Jev ranking skipped ({type(e).__name__})")
+
+
+def _jev_second_opinions(observations: list, findings: list, settings: dict, combined_result: dict) -> None:
+    """Hooks B and C (shadow): Jev's page class of each HTML lead and its kind and
+    sensitivity, recorded beside the deterministic verdict; no lead changes."""
+    from recon.helpers.ai_planner import route_exposure_assess, route_wall_check
+
+    by_key = {(o.route.baseurl, o.route.path): o for o in observations}
+    try:
+        if route_wall_check.jev_wall_check_enabled(settings):
+            entries = []
+            for f in findings:
+                obs = by_key.get((f["baseurl"], f["path"]))
+                if (f["exposure_kind"] == "anonymous_access" and f.get("anon_content_class") == "html"
+                        and obs is not None and obs.anon is not None):
+                    entries.append(verdict.page_entry(obs.anon, obs.route.url))
+            route_wall_check.run_for_pages(entries, settings, combined_result)
+    except Exception as e:  # noqa: BLE001
+        print(f"[!][RouteExposure] Jev wall check skipped ({type(e).__name__})")
+    try:
+        if route_exposure_assess.jev_assess_enabled(settings):
+            pairs = []
+            for f in findings:
+                if not f.get("needs_agent_confirmation"):
+                    continue
+                obs = by_key.get((f["baseurl"], f["path"]))
+                anon_sig = obs.anon_signals if obs is not None else None
+                auth_sig = obs.authed_signals if obs is not None else None
+                keys = (anon_sig.key_paths if anon_sig is not None and anon_sig.key_paths
+                        else (auth_sig.key_paths if auth_sig is not None else []))
+                longest = max(anon_sig.max_array_len if anon_sig is not None else 0,
+                              auth_sig.max_array_len if auth_sig is not None else 0)
+                pairs.append((f, route_exposure_assess.item_for(f, keys, longest)))
+            route_exposure_assess.run_for_candidates(pairs, settings, combined_result)
+    except Exception as e:  # noqa: BLE001
+        print(f"[!][RouteExposure] Jev assessment skipped ({type(e).__name__})")
+
+
 def _run(combined_result: dict, settings: dict, started: str) -> dict:
     from recon.helpers import circuit_breaker as cb
 
@@ -264,6 +310,7 @@ def _run(combined_result: dict, settings: dict, started: str) -> dict:
     routes = [r for r in corpus.routes.values() if guard(r.url)]
     out_of_scope = len(corpus.routes) - len(routes)
     selected, cut = ranking.select(routes, per_host=cfg["per_host"], total=cfg["total"])
+    _jev_rank(routes, settings, combined_result)
     hosts = len({_host(r.baseurl) for r in routes})
     print(f"[*][RouteExposure] {len(routes)} route(s) on {hosts} host(s): {len(selected)} requested, "
           f"{cut} cut by the budget")
@@ -281,6 +328,7 @@ def _run(combined_result: dict, settings: dict, started: str) -> dict:
         observations += _observe_all(follow_up, probe, cfg)
     assessed = verdict.assess(observations, cfg)
     findings = assessed["findings"]
+    _jev_second_opinions(observations, findings, settings, combined_result)
 
     dropped = dict(assessed["dropped"], unsafe=corpus.unsafe)
     summary = {

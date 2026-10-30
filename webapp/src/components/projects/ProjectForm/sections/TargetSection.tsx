@@ -942,7 +942,8 @@ export function TargetSection({ data, updateField, mode = 'create', savedScope, 
                   // aiInPipeline does not set or reset them.
                   const jevOnlyHooks: Array<{
                     field: 'ffufJevBasePaths' | 'httpxJevPageType' | 'resourceEnumJevToolHealth' | 'hakrawlerJevSeedOrder'
-                      | 'serializedScanJevRank'
+                      | 'serializedScanJevRank' | 'routeExposureJevRank' | 'routeExposureJevWallCheck'
+                      | 'routeExposureJevAssess'
                     label: string
                     summary: string
                     description: string
@@ -976,6 +977,24 @@ export function TargetSection({ data, updateField, mode = 'create', savedScope, 
                       label: 'Serialized Objects: Rank Candidates with Jev',
                       summary: 'Asks which format each flagged blob is and how likely it is to be a reachable sink.',
                       description: 'When the Serialized Object Scan flags candidates, Jev is asked, per distinct blob, which serialization format it is (one of the scanner\'s 13, or none) and whether it is likely to be an attacker-reachable deserialization sink. Jev is not told which format the signatures matched, so its answer is a second opinion. Both answers are written onto the candidate, and the agent\'s deserialization skill confirms the most reachable first. It never drops a candidate and never changes the matched format; without a Jev token, or for a blob Jev cannot answer, the candidates stay exactly as the signatures flagged them. Needs the Serialized Object Scan on. At most 200 distinct blobs per scan, within a 60-second budget. Same switch as in the Serialized Object Scan module.',
+                    },
+                    {
+                      field: 'routeExposureJevRank',
+                      label: 'Route Exposure: Rank Routes with Jev',
+                      summary: 'Asks whether each route is meant only for logged-in, internal or admin callers.',
+                      description: 'Jev is asked, per route, whether it is meant only for logged-in, internal or administrative callers, from its path, method, category and four flags. Shadow mode: the answer is recorded next to the deterministic budget order, which does not change. It never drops a route. Needs Route Exposure on. At most 400 routes per scan. Same switch as in the Route Exposure module.',
+                    },
+                    {
+                      field: 'routeExposureJevWallCheck',
+                      label: 'Route Exposure: Spot Disguised Login Walls with Jev',
+                      summary: 'Asks whether an HTML lead is really a login form, an error page or a placeholder.',
+                      description: 'For the HTML pages the deterministic page check kept as leads, Jev is asked which page class each is. The body reaches Jev masked and capped. Shadow mode: the answer is recorded next to the deterministic verdict and no lead changes. Needs Route Exposure on. At most 100 pages per scan, within a 60-second budget. Same switch as in the Route Exposure module.',
+                    },
+                    {
+                      field: 'routeExposureJevAssess',
+                      label: 'Route Exposure: Assess Leads with Jev',
+                      summary: 'Asks which kind of route each lead is and how sensitive its answer is.',
+                      description: 'Jev is asked, per lead, which kind of route it is and how sensitive what it returns is, from the evidence alone: statuses, content class, masked key names and closed hints. It is never told the route class or a value. Shadow mode: the answers are recorded next to the route class and no lead changes. Needs Route Exposure on. At most 200 leads per scan, within a 60-second budget. Same switch as in the Route Exposure module.',
                     },
                   ]
                   return (

@@ -166,7 +166,8 @@ const NOTES = [
     'aiPipelineModel, true = TypeSafe Jev), and switching one ON is refused unless the project ' +
     'owner has a Jev token. preflight_scope_check reports each hook\'s effective engine.',
   'Jev-only hooks have TWO levels: aiInPipeline, then the hook\'s own *Jev* flag (ffufJevBasePaths, ' +
-    'httpxJevPageType, resourceEnumJevToolHealth, hakrawlerJevSeedOrder, serializedScanJevRank). ' +
+    'httpxJevPageType, resourceEnumJevToolHealth, hakrawlerJevSeedOrder, serializedScanJevRank, ' +
+    'routeExposureJevRank, routeExposureJevWallCheck, routeExposureJevAssess). ' +
     'They have no LLM engine, aiInPipeline does not set or reset them, and switching one ON is ' +
     'refused unless the project owner has a Jev token. Page types, base paths and seed order take ' +
     'effect from Jev\'s answers (page-type labels land on the Endpoint, FFuf fuzzes Jev\'s ' +

@@ -512,6 +512,9 @@ export const reconPresetSchema = z.object({
   routeExposureCrossHost: bool,
   routeExposureCorsRider: bool,
   routeExposureCacheRider: bool,
+  routeExposureJevRank: bool,
+  routeExposureJevWallCheck: bool,
+  routeExposureJevAssess: bool,
 
   // -- CVE Lookup --
   cveLookupEnabled: bool,
@@ -1102,6 +1105,9 @@ OpenAPI source URLs and the project Authenticated Session profile are project-sp
 - routeExposureGitWalk: boolean - After an exposed .git/HEAD, fetch the ref and one commit object and inflate it bounded to prove reconstructability; stores only the proof, never the tree or blobs. Default true.
 - routeExposureCrossHost: boolean - Try a path that hit on one host against other in-scope hosts with the same technology or title, at most 50. Default false.
 - routeExposureCorsRider: boolean - On a personalised, sensitive logged-in route, resend with crafted Origin headers to detect a credentialed reflected origin; headers only, never a body. Default true.
+- routeExposureJevRank: boolean - Ask TypeSafe AI Jev (jev-1.13.0) whether each route is meant only for logged-in, internal or admin callers. Shadow: recorded beside the deterministic budget order, which stays as is. Only when aiInPipeline=true and routeExposureEnabled=true; needs a Jev token on the owner's account. Never drops a route. Default false.
+- routeExposureJevWallCheck: boolean - Ask Jev whether an HTML lead the deterministic page check kept is really a login wall, error page or placeholder. Shadow: recorded only, no lead changes. Same gating and token rule. Default false.
+- routeExposureJevAssess: boolean - Ask Jev which kind of route each lead is and how sensitive its answer is, from the evidence alone (never the route class or a value). Shadow: recorded only, no lead changes. Same gating and token rule. Default false.
 - routeExposureCacheRider: boolean - On a personalised, sensitive logged-in route, check whether the answer is cacheable to an anonymous visitor; never plants or fetches from cache. Default true.
 
 ## CVE Lookup
