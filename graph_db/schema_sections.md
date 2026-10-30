@@ -503,7 +503,10 @@ Route exposure properties (source="route_exposure"):
 - http_method, path, baseurl (string): the route; matched_at and host locate it for the UI and the prune
 - cors_variants, cache_signals (list[string]), git_walk_proof (string): set by the v2 riders and the git walk proof
 - git_tree_prefix (string): the first 8 hex characters of the tree the git walk's commit object names; only beside git_walk_proof, and never the tree or a blob itself
-- route_jev_kind, route_jev_kind_confidence, route_jev_sensitivity, route_jev_source, anon_page_class, anon_page_class_confidence, anon_page_class_source: TypeSafe Jev's opinions, only from a run that asked Jev (shadow rollout writes none)
+- route_jev_kind (string: internal_api, debug_management, admin_function, data_export, old_version, uploaded_content or public_content), route_jev_kind_confidence (integer 0-100), route_jev_sensitivity (integer 0-100), route_jev_source (string "jev_classifier"): TypeSafe Jev's assessment of a lead; the agent's lead query reads the most sensitive first and puts public_content at confidence >= 70 last. Never replaces route_class
+- route_jev_privacy (integer 0-100): Jev's reading of how likely the route is meant only for logged-in, internal or administrative callers; it filled the request budget after the floor
+- anon_page_class (string: app, login_only, parked, default, placeholder or error), anon_page_class_confidence (integer 0-100), anon_page_class_source (string "jev_classifier"): Jev's page class of an HTML lead's anonymous answer; a non-app class at confidence >= 70 puts the lead last, never removes it
+- The route_jev_* and anon_page_class* properties come only from a run that asked Jev, and each run that writes the node replaces them
 - Typical query: "list pending route exposure leads, most sensitive first" → `MATCH (v:Vulnerability {source:'route_exposure'}) WHERE v.needs_agent_confirmation = true AND NOT (:ChainFinding)-[:CONFIRMS]->(v) OPTIONAL MATCH (e:Endpoint)-[:HAS_VULNERABILITY]->(v) RETURN v.id, v.exposure_kind, v.route_class, v.matched_at, v.anon_status, v.authed_status, v.auth_expected_by, v.leak_signals ORDER BY coalesce(v.route_jev_sensitivity, -1) DESC, v.confidence DESC, v.id`
 
 GVM-specific properties (source="gvm"):

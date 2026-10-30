@@ -228,8 +228,8 @@ def verify(name: str, project_id: str) -> int:
         report.append(f"- jev_shadow.{hook}: rollout={rec.get('rollout')} model={rec.get('model')} "
                       f"decisions={stats.get('decisions')} agreed={stats.get('agreed_pct')}% "
                       f"fallbacks={stats.get('fallbacks')}")
-        if rec.get("rollout") != "shadow":
-            failures.append(f"jev_shadow.{hook} rollout {rec.get('rollout')!r}, expected 'shadow'")
+        if rec.get("rollout") != "act":
+            failures.append(f"jev_shadow.{hook} rollout {rec.get('rollout')!r}, expected 'act'")
         if "fallbacks" in jev and stats.get("fallbacks") != jev["fallbacks"]:
             failures.append(f"jev_shadow.{hook} fallbacks={stats.get('fallbacks')}, expected {jev['fallbacks']}")
         if jev.get("fallbacks") == 0 and not re.match(r"^jev-\d+\.\d+\.\d+$", str(rec.get("model"))):
@@ -239,6 +239,27 @@ def verify(name: str, project_id: str) -> int:
     for hook in jev.get("absent") or []:
         if hook in shadow:
             failures.append(f"jev_shadow.{hook} exists, but the hook must not run")
+    # The hooks act: with every call answered, Jev's reading is on the findings the graph keeps.
+    if jev.get("fallbacks") == 0:
+        hooks = set(jev.get("hooks") or [])
+        leads = [f for f in findings if f.get("needs_agent_confirmation")]
+        if "route_exposure_assess" in hooks:
+            missing = sum(1 for f in leads if not isinstance(f.get("route_jev_sensitivity"), int))
+            report.append(f"- route_jev_sensitivity on {len(leads) - missing}/{len(leads)} lead(s)")
+            if missing and len(leads) <= 200:
+                failures.append(f"{missing} lead(s) carry no route_jev_sensitivity")
+        if "route_privacy_rank" in hooks:
+            ranked = sum(1 for f in findings if isinstance(f.get("route_jev_privacy"), int))
+            report.append(f"- route_jev_privacy on {ranked}/{len(findings)} finding(s)")
+            if not ranked:
+                failures.append("no finding carries route_jev_privacy")
+        if "route_exposure_wall" in hooks:
+            html = [f for f in leads if f.get("exposure_kind") == "anonymous_access"
+                    and f.get("anon_content_class") == "html"]
+            classed = sum(1 for f in html if f.get("anon_page_class"))
+            report.append(f"- anon_page_class on {classed}/{len(html)} HTML lead(s)")
+            if html and not classed:
+                failures.append("no HTML lead carries anon_page_class")
 
     got = {(_role_of(f["baseurl"]), f["path"], f["exposure_kind"]): f for f in findings}
     disabled = {k for k, v in (sc.get("settings") or {}).items() if v is False}

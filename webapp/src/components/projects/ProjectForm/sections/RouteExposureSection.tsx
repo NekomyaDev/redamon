@@ -324,12 +324,12 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
               </div>
 
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Second opinions from Jev</label>
+                <label className={styles.fieldLabel}>Jev decisions</label>
                 <div className={styles.toggleRow} style={{ alignItems: 'center', gap: 'var(--space-2)' }}>
                   <AiToggleLabel
                     label="Rank routes with Jev"
                     tooltip={
-                      'Jev is asked, per route, whether it is meant only for logged-in, internal or administrative callers. Shadow mode: the answer is recorded next to the deterministic budget order, which does not change, and no route is ever dropped. Same switch as in the Target tab AI panel. ' +
+                      'Jev is asked, per route, whether it is meant only for logged-in, internal or administrative callers, and its answer decides which routes fill the request budget after the always-requested ones: the routes it reads as private are requested first. The answer is saved on each lead. No always-requested route is ever cut; without a Jev answer the order is the built-in one. Same switch as in the Target tab AI panel. ' +
                       (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
                     }
                   />
@@ -346,7 +346,7 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                   <AiToggleLabel
                     label="Spot disguised login walls with Jev"
                     tooltip={
-                      'For the HTML pages kept as leads, Jev is asked whether each is really a login form, an error page or a placeholder. The body reaches Jev masked. Shadow mode: recorded only, no lead changes. Same switch as in the Target tab AI panel. ' +
+                      'For the HTML pages kept as leads, Jev is asked whether each is really a login form, an error page or a placeholder. The body reaches Jev masked. Its page class is saved on the lead, and a lead it places as a login wall or error page at confidence 70 or more moves to the end of the list the agent confirms. No lead is ever dropped. Same switch as in the Target tab AI panel. ' +
                       (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
                     }
                   />
@@ -363,7 +363,7 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                   <AiToggleLabel
                     label="Assess leads with Jev"
                     tooltip={
-                      'Jev is asked, per lead, which kind of route it is and how sensitive its answer is, from the evidence alone, never the route class or a value. Shadow mode: recorded only, no lead changes. Same switch as in the Target tab AI panel. ' +
+                      'Jev is asked, per lead, which kind of route it is and how sensitive its answer is, from the evidence alone, never the route class or a value. Both answers are saved on the lead, and the agent confirms the most sensitive leads first; a lead Jev reads as public content at confidence 70 or more goes last. No lead is ever dropped and the route class is never rewritten. Same switch as in the Target tab AI panel. ' +
                       (!data.aiInPipeline ? 'Enable "AI in Pipeline" in the Target tab to use this.' : '')
                     }
                   />

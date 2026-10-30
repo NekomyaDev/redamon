@@ -4,9 +4,7 @@ Route exposure lead assessment on TypeSafe Jev (route exposure, hook C)
 Each route exposure lead (needs_agent_confirmation) carries a deterministic
 route_class. This hook asks Jev two typed questions about each lead's evidence:
 which kind of route it is (a choice over a closed set that adds `public_content`)
-and how sensitive what it returns is (a noul). Under ACT (later) the leads would
-be ordered by sensitivity with public_content last; it never drops a lead and never
-rewrites route_class.
+and how sensitive what it returns is (a noul).
 
 Jev gets evidence only, never the verdict: the path, the statuses, the content
 class and size bucket, whether the bodies matched, the masked key names, the
@@ -14,19 +12,27 @@ largest array, and the closed hint and signal labels. No route_class and no
 signature, so its kind is a second opinion, not the classifier read back. No value
 crosses: key names only, masked like the stored snippet.
 
-Shipped in SHADOW: each answer is recorded next to route_class mapped into the same
-closed set, in `jev_shadow.route_exposure_assess`. Rich items blur when several
-share one state (jev-1.13.0), so the agent asks one request per lead; recon sends
-BATCH_SIZE per call. Log lines carry counts and indexes only.
+ROLLOUT is ACT: each answered lead gets `route_jev_kind`,
+`route_jev_kind_confidence`, `route_jev_sensitivity` and `route_jev_source`, which
+the graph writer persists. The leads are ordered by that sensitivity, most
+sensitive first, and a lead Jev reads as public content (`is_public`: confidence
+>= PUBLIC_CONFIDENCE) is put last; the agent's lead query orders the same way. It
+never drops a lead and never rewrites route_class: a lead Jev could not answer
+keeps no annotation and follows the answered ones, so with Jev off, out of credit
+or down the leads are exactly the deterministic ones. Every decision is also
+recorded next to route_class mapped into the same closed set, in
+`jev_shadow.route_exposure_assess`. Rich items blur when several share one state
+(jev-1.13.0), so the agent asks one request per lead; recon sends BATCH_SIZE per
+call. Log lines carry counts and indexes only.
 """
 
 import os
 import time
 from typing import List, Optional, Tuple
 
-from recon.helpers.ai_planner.jev_shadow import SHADOW, ShadowRecorder, jev_model, jev_post
+from recon.helpers.ai_planner.jev_shadow import ACT, ShadowRecorder, jev_model, jev_post
 
-ROLLOUT = SHADOW
+ROLLOUT = ACT
 
 HOOK = "route_exposure_assess"
 _TAG = "RouteExposure-Jev"
@@ -51,7 +57,10 @@ MAX_PATH_CHARS = 200
 MAX_KEY_PATHS = 60
 MAX_KEY_CHARS = 80
 
-#: route_class -> the closed kind, for the shadow baseline only.
+#: Below this a public_content answer annotates the lead but does not move it.
+PUBLIC_CONFIDENCE = 70
+
+#: route_class -> the closed kind, for the decision record's baseline only.
 _BASELINE = {"internal_api": "internal_api", "debug_management": "debug_management",
              "admin_function": "admin_function", "data_export": "data_export",
              "old_version": "old_version", "uploaded_content": "uploaded_content",
@@ -107,10 +116,17 @@ def jev_assess_enabled(settings: dict) -> bool:
     return bool(settings.get("AI_IN_PIPELINE") and settings.get("ROUTE_EXPOSURE_JEV_ASSESS"))
 
 
+def is_public(finding: dict) -> bool:
+    """Jev read the lead as public content, confidently enough to put it last."""
+    conf = finding.get("route_jev_kind_confidence")
+    return (finding.get("route_jev_kind") == "public_content" and isinstance(conf, int)
+            and not isinstance(conf, bool) and conf >= PUBLIC_CONFIDENCE)
+
+
 def run_for_candidates(pairs: List[Tuple[dict, dict]], settings: dict, recon_data: Optional[dict],
                        clock=time.monotonic) -> dict:
-    """`pairs` is (finding, request item) per lead. Never raises; returns count stats.
-    Under SHADOW nothing on the findings changes."""
+    """`pairs` is (finding, request item) per lead. Under ACT each answered finding
+    gets Jev's kind and sensitivity. Never raises; returns count stats."""
     stats = {"candidates": 0, "asked": 0, "failed_batches": 0, "not_asked": 0}
     if not pairs or not jev_assess_enabled(settings):
         return stats
@@ -148,6 +164,11 @@ def run_for_candidates(pairs: List[Tuple[dict, dict]], settings: dict, recon_dat
                 baseline = _BASELINE.get(str(finding.get("route_class")), "public_content")
                 recorder.decision(f"lead_{start + offset}", kind, conf, baseline, sensitivity=sens,
                                   exposure_kind=finding.get("exposure_kind"), path=finding.get("path"))
+                if ROLLOUT == ACT:
+                    finding["route_jev_kind"] = kind
+                    finding["route_jev_kind_confidence"] = conf
+                    finding["route_jev_sensitivity"] = sens
+                    finding["route_jev_source"] = "jev_classifier"
         print(f"[+][{_TAG}] {stats['asked']} leads assessed, {stats['failed_batches']} batches fell back")
     except Exception as e:  # noqa: BLE001 - an assessment is never worth breaking the scan
         print(f"[!][{_TAG}] Pass failed ({type(e).__name__}) - the leads stand as found.")

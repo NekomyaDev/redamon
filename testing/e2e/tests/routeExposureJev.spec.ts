@@ -5,7 +5,7 @@ import { mintToken, signIn } from './auth'
  * The three Route Exposure Jev hooks, driven through the real settings UI.
  *
  * routeExposureJevRank, routeExposureJevWallCheck and routeExposureJevAssess each
- * have two controls bound to one field: a row under "Second opinions from Jev" on
+ * have two controls bound to one field: a row under "Jev decisions" on
  * the Route Exposure card (Vulnerability Scanning tab) and a card under Target &
  * Modules -> AI in Pipeline. A change on one must show on the other with no copy
  * step, leave the form in the PUT, and persist. Turning one on is refused

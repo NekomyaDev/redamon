@@ -3,8 +3,9 @@
 The score's reasons double as ``auth_expected_hints``: a route OpenAPI declares
 secured, or that a discovery tool already saw denied, is a route whose
 anonymous 2xx means something. The budget keeps the floor (score >= 5 and every
-version-control/env seed), then fills each host by score, round-robin across
-hosts so the first host never spends the whole budget.
+version-control/env seed), then fills each host by Jev's privacy answer when the
+route_privacy_rank hook gave one and by score otherwise, round-robin across hosts
+so the first host never spends the whole budget.
 """
 
 from __future__ import annotations
@@ -85,7 +86,15 @@ def score(route: Route) -> int:
 
 
 def _order_key(route: Route):
-    return (not route.floor, -route.score, -getattr(route, "jev_rank", 0.0), route.path)
+    """Floor first, by prior score and path only: the per-host cap can cut the floor
+    itself, and which floor routes survive it must never depend on Jev. After the
+    floor, Jev's privacy answer (route_privacy_rank) fills the budget: answered routes
+    by that answer, then the unanswered ones by prior score, so with no answer the
+    order is the deterministic one."""
+    if route.floor:
+        return (False, -route.score, False, 0.0, 0, route.path)
+    jev = route.jev_rank
+    return (True, 0, jev is None, -(jev or 0.0), -route.score, route.path)
 
 
 def select(routes: list, *, per_host: int, total: int) -> tuple[list, int]:

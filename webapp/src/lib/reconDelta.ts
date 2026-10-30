@@ -115,6 +115,7 @@ export const VOLATILE_PROPERTIES = new Set([
   'route_jev_kind_confidence',
   'route_jev_sensitivity',
   'route_jev_source',
+  'route_jev_privacy',
   'anon_page_class',
   'anon_page_class_confidence',
   'anon_page_class_source',

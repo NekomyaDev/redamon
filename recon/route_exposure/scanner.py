@@ -251,8 +251,9 @@ def _cross_host_routes(observations: list, corpus, combined_result: dict, cfg: d
 
 
 def _jev_rank(routes: list, settings: dict, combined_result: dict) -> None:
-    """Hook A (shadow): Jev's privacy reading of each route, recorded beside the prior
-    score's; the budget order is the deterministic one."""
+    """Hook A: Jev's privacy reading of each route, set as `jev_rank`, which fills the
+    budget after the floor. Runs before ranking.select; the routes carry their prior
+    score already."""
     try:
         from recon.helpers.ai_planner import route_privacy_rank
         route_privacy_rank.run_for_routes(routes, settings, combined_result)
@@ -260,21 +261,41 @@ def _jev_rank(routes: list, settings: dict, combined_result: dict) -> None:
         print(f"[!][RouteExposure] Jev ranking skipped ({type(e).__name__})")
 
 
+def _order_leads(findings: list) -> None:
+    """The leads, in their own slots, ordered as the agent's lead query reads them:
+    Jev's answered ones most sensitive first, the unanswered after, and the ones Jev
+    placed as a wall or as public content last. A signature finding keeps its slot;
+    with no Jev annotation the order is unchanged. Re-orders only; never drops."""
+    from recon.helpers.ai_planner import route_exposure_assess, route_wall_check
+
+    def key(finding: dict) -> tuple:
+        demoted = route_wall_check.is_wall(finding) or route_exposure_assess.is_public(finding)
+        sensitivity = finding.get("route_jev_sensitivity")
+        if isinstance(sensitivity, int) and not isinstance(sensitivity, bool):
+            return (demoted, 0, -sensitivity)
+        return (demoted, 1, 0)
+
+    slots = [i for i, f in enumerate(findings) if f.get("needs_agent_confirmation")]
+    for i, finding in zip(slots, sorted((findings[i] for i in slots), key=key)):
+        findings[i] = finding
+
+
 def _jev_second_opinions(observations: list, findings: list, settings: dict, combined_result: dict) -> None:
-    """Hooks B and C (shadow): Jev's page class of each HTML lead and its kind and
-    sensitivity, recorded beside the deterministic verdict; no lead changes."""
+    """Hooks B and C: Jev's page class of each HTML lead and its kind and sensitivity,
+    written onto the leads (the graph writer persists them), then the leads ordered by
+    them. No lead is dropped and no route_class rewritten."""
     from recon.helpers.ai_planner import route_exposure_assess, route_wall_check
 
     by_key = {(o.route.baseurl, o.route.path): o for o in observations}
     try:
         if route_wall_check.jev_wall_check_enabled(settings):
-            entries = []
+            pairs = []
             for f in findings:
                 obs = by_key.get((f["baseurl"], f["path"]))
                 if (f["exposure_kind"] == "anonymous_access" and f.get("anon_content_class") == "html"
                         and obs is not None and obs.anon is not None):
-                    entries.append(verdict.page_entry(obs.anon, obs.route.url))
-            route_wall_check.run_for_pages(entries, settings, combined_result)
+                    pairs.append((f, verdict.page_entry(obs.anon, obs.route.url)))
+            route_wall_check.run_for_pages(pairs, settings, combined_result)
     except Exception as e:  # noqa: BLE001
         print(f"[!][RouteExposure] Jev wall check skipped ({type(e).__name__})")
     try:
@@ -294,6 +315,10 @@ def _jev_second_opinions(observations: list, findings: list, settings: dict, com
             route_exposure_assess.run_for_candidates(pairs, settings, combined_result)
     except Exception as e:  # noqa: BLE001
         print(f"[!][RouteExposure] Jev assessment skipped ({type(e).__name__})")
+    try:
+        _order_leads(findings)
+    except Exception as e:  # noqa: BLE001 - an order is never worth breaking the scan
+        print(f"[!][RouteExposure] Jev lead order skipped ({type(e).__name__})")
 
 
 def _run(combined_result: dict, settings: dict, started: str) -> dict:
@@ -309,8 +334,10 @@ def _run(combined_result: dict, settings: dict, started: str) -> dict:
     guard = build_guard(combined_result, settings)
     routes = [r for r in corpus.routes.values() if guard(r.url)]
     out_of_scope = len(corpus.routes) - len(routes)
-    selected, cut = ranking.select(routes, per_host=cfg["per_host"], total=cfg["total"])
+    for route in routes:
+        ranking.score(route)
     _jev_rank(routes, settings, combined_result)
+    selected, cut = ranking.select(routes, per_host=cfg["per_host"], total=cfg["total"])
     hosts = len({_host(r.baseurl) for r in routes})
     print(f"[*][RouteExposure] {len(routes)} route(s) on {hosts} host(s): {len(selected)} requested, "
           f"{cut} cut by the budget")
@@ -389,7 +416,7 @@ def run_route_exposure(combined_result: dict, settings: dict) -> dict:
 
 def run_route_exposure_isolated(combined_result: dict, settings: dict) -> TopLevelKeys:
     """Thread-safe: deep-copies first, returns this tool's payload plus its own Jev
-    shadow records (merged per hook by _merge_isolated_result)."""
+    decision records (merged per hook by _merge_isolated_result)."""
     snapshot = copy.deepcopy(combined_result)
     run_route_exposure(snapshot, settings)
     out = TopLevelKeys(route_exposure=snapshot.get("route_exposure", {}))

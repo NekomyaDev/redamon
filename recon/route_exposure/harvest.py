@@ -49,6 +49,8 @@ class Route:
     score: int = 0
     floor: bool = False
     hints: list = field(default_factory=list)
+    #: Jev's privacy noul (route_privacy_rank), None when Jev was not asked or did not answer.
+    jev_rank: Optional[float] = None
 
     @property
     def url(self) -> str:

@@ -135,8 +135,10 @@ scenarios:
                     routeExposureFollowCatalogs: false, routeExposureGitWalk: false,
                     routeExposureCorsRider: false, routeExposureCacheRider: false,
                     routeExposureCrossHost: true}}
-  # v3 (§22.7): v2-A's settings with AI in Pipeline and the three Jev hooks, all in shadow.
-  # The route rows are v2-A's; `jev` names the shadow records the run must (or must not) hold.
+  # v3 (§22.7): v2-A's settings with AI in Pipeline and the three Jev hooks, all acting.
+  # The route rows are v2-A's (Jev ranks and orders, never adds or drops); `jev` names the
+  # decision records the run must (or must not) hold, and with no fallback the leads carry
+  # Jev's fields.
   v3-A: {phase: v2, roles: [main, twin, hostile], auth: bearer, needs: [keep_docs],
          settings: {aiInPipeline: true, routeExposureJevRank: true, routeExposureJevWallCheck: true,
                     routeExposureJevAssess: true},

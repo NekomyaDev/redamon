@@ -359,3 +359,21 @@ def test_the_browser_part_makes_the_render_part_of_the_proof():
     assert "Proof needs BOTH: a page rendered without the session fired the API (step 2)" in flat
     assert "Name that page in the evidence." in flat
     assert "without the render the lead stays unproven, so never skip step 2" in flat
+
+
+def test_the_lead_query_follows_jevs_reading_and_demotes_walls_and_public_content():
+    """Recon writes Jev's opinions onto the leads; the pull reads them in the same order
+    recon put them in (route_exposure scanner._order_leads): most sensitive first, a
+    confident wall page or public-content reading last. Never a filter: no lead drops."""
+    from prompts.route_exposure_shared import candidate_query
+    query = candidate_query(["anonymous_access", "sensitive_data"])
+    order = query[query.index("ORDER BY"):query.index("LIMIT 50")]
+    assert order.index("anon_page_class IN ['login_only', 'parked', 'default', 'placeholder', 'error']") \
+        < order.index("coalesce(v.route_jev_sensitivity, -1) DESC")
+    assert "coalesce(v.anon_page_class_confidence, 0) >= 70" in order
+    assert "v.route_jev_kind = 'public_content'" in order
+    assert "coalesce(v.route_jev_kind_confidence, 0) >= 70" in order
+    where = query[query.index("WHERE"):query.index("RETURN")]
+    assert "jev" not in where and "page_class" not in where
+    assert "v.route_jev_kind AS jev_kind, v.anon_page_class AS page_class" in query
+    assert "never prove or reject a lead on their own" in query

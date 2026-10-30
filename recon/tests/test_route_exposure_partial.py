@@ -118,6 +118,40 @@ def test_bails_with_no_targets():
     assert not client.update_graph_from_route_exposure.called
 
 
+def _jev_agent(url, json=None, headers=None, timeout=None):
+    r = MagicMock(status_code=200, text="")
+    if url.endswith("/jev/route-privacy-rank"):
+        r.json.return_value = {"scores": [0.9] * len(json["routes"]), "model": "jev-1.13.0"}
+    elif url.endswith("/jev/page-type"):
+        r.json.return_value = {"labels": [{"page_class": "app", "confidence": 80} for _ in json["pages"]],
+                               "model": "jev-1.13.0"}
+    elif url.endswith("/jev/route-exposure-assess"):
+        r.json.return_value = {"labels": [{"kind": "data_export", "kind_confidence": 90, "sensitivity": 88}
+                                          for _ in json["candidates"]], "model": "jev-1.13.0"}
+    else:
+        raise AssertionError(f"unexpected agent call {url}")
+    return r
+
+
+def test_the_jev_hooks_act_on_the_partial_path_and_reach_the_graph_writer():
+    """A partial run shares run_route_exposure, so Jev's answers land on the findings
+    the writer persists, exactly as in the full pipeline."""
+    from recon.helpers.ai_planner import jev_shadow
+    jev_on = dict(SETTINGS, AI_IN_PIPELINE=True, ROUTE_EXPOSURE_JEV_RANK=True,
+                  ROUTE_EXPOSURE_JEV_WALL_CHECK=True, ROUTE_EXPOSURE_JEV_ASSESS=True)
+    with FakeApp({"/internal/users/export": json_answer(200, USERS)}) as app, \
+            patch.object(jev_shadow.requests, "post", side_effect=_jev_agent) as post:
+        client, _ = _run({"include_graph_targets": True}, graph_data=_graph_data(app.base),
+                         settings=jev_on)
+    called = {c.args[0].rsplit("/", 1)[-1] for c in post.call_args_list}
+    assert {"route-privacy-rank", "route-exposure-assess"} <= called
+    findings = client.update_graph_from_route_exposure.call_args[0][0]["route_exposure"]["findings"]
+    lead = next(f for f in findings if f["path"] == "/internal/users/export" and f["needs_agent_confirmation"])
+    assert (lead["route_jev_kind"], lead["route_jev_sensitivity"], lead["route_jev_source"]) == \
+        ("data_export", 88, "jev_classifier")
+    assert lead["route_jev_privacy"] == 90
+
+
 def test_settings_overrides_apply():
     with FakeApp({"/internal/users/export": json_answer(200, USERS)}) as app:
         client, _ = _run({"include_graph_targets": True,

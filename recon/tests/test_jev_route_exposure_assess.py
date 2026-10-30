@@ -5,9 +5,12 @@ What it locks in:
 - the item is evidence only and closed: no route_class, no signature, no value; an
   unknown content class, bucket, signal, hint or generator is clamped or dropped;
 - only leads (needs_agent_confirmation) are asked, batched, capped, in a time budget;
-- a malformed answer or a failed batch is a fallback, never a raise;
-- SHADOW changes no finding and records Jev's kind beside route_class mapped into
-  the same closed set;
+- a malformed answer or a failed batch is a fallback, never a raise, and annotates
+  nothing;
+- ACT writes Jev's kind and sensitivity onto the lead (route_jev_*), never touches
+  route_class or any other field, and records Jev's kind beside route_class mapped
+  into the same closed set;
+- is_public needs public_content at confidence >= PUBLIC_CONFIDENCE;
 - stdout carries counts only; the call sits in the shared entry.
 """
 from __future__ import annotations
@@ -129,10 +132,12 @@ def test_the_time_budget_counts_what_is_left_unasked():
 def test_a_malformed_answer_is_a_fallback(body):
     calls, post = _post(body=body)
     recon = {}
+    finding = _finding()
     with mock.patch.object(jev_shadow.requests, "post", side_effect=post):
-        stats = ra.run_for_candidates(_pairs([_finding()]), ON, recon)
+        stats = ra.run_for_candidates(_pairs([finding]), ON, recon)
     assert stats["failed_batches"] == 1 and stats["asked"] == 0
     assert recon["jev_shadow"][ra.HOOK]["summary"]["fallbacks"] == 1
+    assert not any(k.startswith("route_jev_") for k in finding)
 
 
 def test_a_failed_call_never_raises():
@@ -141,18 +146,33 @@ def test_a_failed_call_never_raises():
         assert ra.run_for_candidates(_pairs([_finding()]), ON, {})["failed_batches"] == 1
 
 
+def test_the_hook_acts():
+    assert ra.ROLLOUT == jev_shadow.ACT
+
+
 @pytest.mark.parametrize("route_class,baseline", [
     ("data_export", "data_export"), ("client_gated", "admin_function"), ("unknown", "public_content")])
-def test_shadow_changes_no_finding_and_records_the_mapped_baseline(route_class, baseline):
+def test_act_annotates_the_lead_only_and_records_the_mapped_baseline(route_class, baseline):
     finding = _finding(route_class=route_class)
     before = copy.deepcopy(finding)
     calls, post = _post(label=("public_content", 70, 10))
     recon = {}
     with mock.patch.object(jev_shadow.requests, "post", side_effect=post):
         ra.run_for_candidates(_pairs([finding]), ON, recon)
-    assert finding == before
+    added = {k: v for k, v in finding.items() if k not in before}
+    assert added == {"route_jev_kind": "public_content", "route_jev_kind_confidence": 70,
+                     "route_jev_sensitivity": 10, "route_jev_source": "jev_classifier"}
+    assert {k: finding[k] for k in before} == before        # route_class and the rest untouched
+    assert recon["jev_shadow"][ra.HOOK]["rollout"] == "act"
     record = recon["jev_shadow"][ra.HOOK]["records"][0]
     assert (record["jev"], record["baseline"], record["sensitivity"]) == ("public_content", baseline, 10)
+
+
+@pytest.mark.parametrize("kind,conf,public", [
+    ("public_content", 70, True), ("public_content", 69, False), ("data_export", 99, False),
+    ("public_content", True, False), (None, 90, False)])
+def test_is_public_needs_public_content_at_the_confidence_floor(kind, conf, public):
+    assert ra.is_public({"route_jev_kind": kind, "route_jev_kind_confidence": conf}) is public
 
 
 def test_every_route_class_verdict_returns_has_a_baseline_in_the_closed_kinds():

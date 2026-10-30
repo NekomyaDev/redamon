@@ -173,7 +173,12 @@ const NOTES = [
     'effect from Jev\'s answers (page-type labels land on the Endpoint, FFuf fuzzes Jev\'s ' +
     'directories, Hakrawler crawls Jev\'s host order, and each serialized-object candidate gets ' +
     'Jev\'s deser_jev_format and deser_jev_exploitability, the order the deserialization skill ' +
-    'confirms them in; that ranking needs serializedScanEnabled too). The tool-health check records ' +
+    'confirms them in; that ranking needs serializedScanEnabled too). The three route exposure ' +
+    'hooks act too, and need routeExposureEnabled: Jev\'s privacy answer fills the request budget ' +
+    'after the always-requested floor, and each lead gets Jev\'s route_jev_kind, ' +
+    'route_jev_sensitivity and anon_page_class, the order the access_control skill confirms them ' +
+    'in (most sensitive first, a login wall, error page or public content last; no lead is ' +
+    'ever dropped). The tool-health check records ' +
     'its verdict in the recon output. Without a token, or when Jev cannot answer, each step runs ' +
     'exactly as it does without AI.',
 ]

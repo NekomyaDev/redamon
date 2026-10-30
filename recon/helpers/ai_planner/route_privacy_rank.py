@@ -4,12 +4,16 @@ Route privacy ranking on TypeSafe Jev (route exposure, hook A)
 The route exposure scan spends a request budget per host, floor first, then by a
 deterministic prior score (OpenAPI security, path words, generator). This hook
 asks Jev one noul per route: is it meant only for logged-in, internal or
-administrative callers? Under ACT (later) the budget after the floor would be
-filled by that answer; it never drops a floor route and never invents one.
+administrative callers?
 
-Shipped in SHADOW: the order and the requests are exactly the deterministic ones,
-and each answer is recorded next to the prior score's own verdict (score >= 5 is
-"private") in the recon JSON `jev_shadow.route_privacy_rank`.
+ROLLOUT is ACT: each answered route gets `jev_rank` (the noul), which fills the
+budget after the floor (ranking._order_key): the routes Jev reads as private are
+requested first, the ones it did not answer follow by prior score. It never drops
+a floor route and never invents one, and with Jev off, out of credit or down the
+order is exactly the deterministic one. The answer also lands on each finding as
+`route_jev_privacy` (0-100), which the graph writer persists. Every decision is
+recorded next to the prior score's own verdict (score >= 5 is "private") in the
+recon JSON `jev_shadow.route_privacy_rank`.
 
 Items are tiny (a path, a method, a closed category and four flags), so one
 request carries many; the path is target text and is only ever state data on the
@@ -22,9 +26,9 @@ call site inside run_route_exposure, so a partial run inherits it.
 import os
 from typing import List, Optional
 
-from recon.helpers.ai_planner.jev_shadow import SHADOW, ShadowRecorder, jev_model, jev_post
+from recon.helpers.ai_planner.jev_shadow import ACT, ShadowRecorder, jev_model, jev_post
 
-ROLLOUT = SHADOW
+ROLLOUT = ACT
 
 HOOK = "route_privacy_rank"
 _TAG = "RoutePrivacy-Jev"
@@ -81,8 +85,9 @@ def jev_route_rank_enabled(settings: dict) -> bool:
 
 
 def run_for_routes(routes: list, settings: dict, recon_data: Optional[dict]) -> Optional[List[float]]:
-    """Ask Jev about the routes (highest prior score first, capped). Returns the noul
-    per asked route, or None. Never raises; under SHADOW the caller ignores the answer."""
+    """Ask Jev about the routes (highest prior score first, capped). The routes must
+    already carry their prior score. Under ACT each answered route gets `jev_rank`;
+    returns the noul per asked route, or None. Never raises."""
     if not routes or not jev_route_rank_enabled(settings):
         return None
     recorder = ShadowRecorder(HOOK, rollout=ROLLOUT)
@@ -114,6 +119,8 @@ def run_for_routes(routes: list, settings: dict, recon_data: Optional[dict]) -> 
                 recorder.decision(f"route_{i}", "private" if score >= 0.5 else "public",
                                   round(score * 100), "private" if prior >= _PRIVATE_SCORE else "public",
                                   prior_score=prior, path=routes[i].path)
+                if ROLLOUT == ACT:
+                    routes[i].jev_rank = score
         print(f"[+][{_TAG}] {len(scores)} distinct routes ranked")
         return [s for s in per_route if s is not None]
     except Exception as e:  # noqa: BLE001 - a ranking is never worth breaking the scan

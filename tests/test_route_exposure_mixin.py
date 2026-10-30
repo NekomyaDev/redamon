@@ -140,6 +140,19 @@ class TestVulnerabilityWrite(unittest.TestCase):
         self.assertEqual(params["jev_props"], {"route_jev_sensitivity": 80, "route_jev_source": "jev_classifier"})
         self.assertNotIn("route_jev_sensitivity", params["props"])
 
+    def test_every_jev_field_the_scan_writes_is_persisted_and_cleared(self):
+        """Each hook's annotation reaches the node, and a run without Jev clears it."""
+        jev = {"route_jev_kind": "data_export", "route_jev_kind_confidence": 90,
+               "route_jev_sensitivity": 85, "route_jev_source": "jev_classifier",
+               "route_jev_privacy": 87, "anon_page_class": "login_only",
+               "anon_page_class_confidence": 88, "anon_page_class_source": "jev_classifier"}
+        (query, params), = _vuln_calls(_write({"findings": [_finding(**jev)]})[0])
+        self.assertEqual(params["jev_props"], jev)
+        removed = query[query.index("REMOVE"):query.index("SET v += $jev_props")]
+        for key in jev:
+            self.assertIn(f"v.{key}", removed)
+            self.assertNotIn(key, params["props"])
+
     def test_artifacts_attach_to_the_base_url_only(self):
         (_q, params), = _vuln_calls(_write({"findings": [_finding(
             exposure_kind="env_file", vulnerability_type="exposed_env_file", path="/.env",

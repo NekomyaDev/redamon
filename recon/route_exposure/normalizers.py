@@ -75,6 +75,9 @@ def build_finding(obs, *, kind: str, route_class: str, auth_expected_by: list,
         finding["authed_status"] = int(obs.authed_status)
     if obs.bodies_match is not None:
         finding["bodies_match"] = bool(obs.bodies_match)
+    jev_rank = getattr(route, "jev_rank", None)
+    if isinstance(jev_rank, (int, float)) and not isinstance(jev_rank, bool):
+        finding["route_jev_privacy"] = round(float(jev_rank) * 100)
     for key, value in (extra or {}).items():
         if value not in (None, "", [], {}):
             finding[key] = value

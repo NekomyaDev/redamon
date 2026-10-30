@@ -27,8 +27,8 @@ from urllib.parse import urlparse
 #: Jev's opinions (plan §13), replaced on every run so a node never keeps a
 #: stale one from a run that asked.
 _JEV_PROPS = ("route_jev_kind", "route_jev_kind_confidence", "route_jev_sensitivity",
-              "route_jev_source", "anon_page_class", "anon_page_class_confidence",
-              "anon_page_class_source")
+              "route_jev_source", "route_jev_privacy", "anon_page_class",
+              "anon_page_class_confidence", "anon_page_class_source")
 
 #: Finding fields copied onto the node as they are (flat scalars and string lists).
 _FINDING_PROPS = (
@@ -203,8 +203,8 @@ class RouteExposureMixin:
               ON CREATE SET v.source = 'route_exposure', v.created_at = datetime()
             SET v += $props, v.updated_at = datetime()
             REMOVE v.route_jev_kind, v.route_jev_kind_confidence, v.route_jev_sensitivity,
-                   v.route_jev_source, v.anon_page_class, v.anon_page_class_confidence,
-                   v.anon_page_class_source
+                   v.route_jev_source, v.route_jev_privacy, v.anon_page_class,
+                   v.anon_page_class_confidence, v.anon_page_class_source
             SET v += $jev_props
             WITH v
             OPTIONAL MATCH (e:Endpoint {path: $path, method: $method, baseurl: $baseurl,
