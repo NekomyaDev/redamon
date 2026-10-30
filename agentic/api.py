@@ -30,7 +30,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from langchain_core.messages import SystemMessage, HumanMessage
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from llm_guard import (master_key_is_weak, require_configured_master_auth,
                        require_internal_auth, require_internal_auth_only,
@@ -1447,6 +1447,61 @@ class SerializedClassifyRequest(BaseModel):
     project_id: Optional[str] = None
 
 
+class RoutePrivacyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, max_length=200)
+    method: Literal["GET", "HEAD"] = "GET"
+    category: Literal["admin", "admin_debug", "api", "api_documentation", "authentication", "dynamic",
+                      "endpoint", "file_access", "file_upload", "search", "upload", "other"] = "other"
+    openapi_secured: bool = False
+    declared_only: bool = False
+    js_only: bool = False
+    host_internal: bool = False
+
+
+class RoutePrivacyRankRequest(BaseModel):
+    routes: List[RoutePrivacyItem] = Field(min_length=1, max_length=400)
+    user_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+
+class RouteCandidateItem(BaseModel):
+    # Evidence only: no route_class and no signature, so Jev's kind is a second
+    # opinion rather than the classifier read back. Key names, never values.
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, max_length=200)
+    method: Literal["GET", "HEAD"] = "GET"
+    anon_status: int = Field(default=0, ge=0, le=999)
+    authed_status: Optional[int] = Field(default=None, ge=0, le=999)
+    content_class: Literal["json", "html", "text", "xml", "binary", "other"] = "other"
+    size_bucket: Literal["<1k", "1-10k", "10-100k", ">100k"] = "<1k"
+    bodies_match: Optional[bool] = None
+    key_paths: List[str] = Field(default_factory=list, max_length=60)
+    max_array_len: int = Field(default=0, ge=0)
+    det_signals: List[Literal["pii", "pii_others", "sensitive_fields", "secret"]] = Field(
+        default_factory=list, max_length=4)
+    auth_expected_by: List[Literal["openapi", "openapi_tag", "declared_only", "seen_denied", "path_word",
+                                   "host_word", "siblings_locked", "version_locked", "vary_auth"]] = Field(
+        default_factory=list, max_length=9)
+    generated_by: Literal["found", "seed", "vcs", "backup", "version", "sibling", "framework", "catalog",
+                          "cross_host"] = "found"
+
+    @field_validator("key_paths")
+    @classmethod
+    def _short_keys(cls, value):
+        if any(len(k) > 80 for k in value):
+            raise ValueError("key paths are at most 80 characters")
+        return value
+
+
+class RouteExposureAssessRequest(BaseModel):
+    candidates: List[RouteCandidateItem] = Field(min_length=1, max_length=50)
+    user_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+
 @app.post("/jev/ffuf-base-paths", tags=["LLM"], dependencies=[Depends(require_internal_auth)])
 async def jev_ffuf_base_paths(body: FfufBasePathsRequest):
     import jev_hooks
@@ -1492,6 +1547,25 @@ async def jev_serialized_classify(body: SerializedClassifyRequest):
         "serialized-classify", body.user_id or "", body.project_id or "",
         len(body.blobs) * 2,
         lambda key: jev_hooks.serialized_classify(key, [b.model_dump() for b in body.blobs]),
+    )
+
+
+@app.post("/jev/route-privacy-rank", tags=["LLM"], dependencies=[Depends(require_internal_auth)])
+async def jev_route_privacy_rank(body: RoutePrivacyRankRequest):
+    import jev_hooks
+    return await _run_jev(
+        "route-privacy-rank", body.user_id or "", body.project_id or "", len(body.routes),
+        lambda key: jev_hooks.route_privacy_rank(key, [r.model_dump() for r in body.routes]),
+    )
+
+
+@app.post("/jev/route-exposure-assess", tags=["LLM"], dependencies=[Depends(require_internal_auth)])
+async def jev_route_exposure_assess(body: RouteExposureAssessRequest):
+    import jev_hooks
+    return await _run_jev(
+        "route-exposure-assess", body.user_id or "", body.project_id or "",
+        len(body.candidates) * 2,
+        lambda key: jev_hooks.route_exposure_assess(key, [c.model_dump() for c in body.candidates]),
     )
 
 
