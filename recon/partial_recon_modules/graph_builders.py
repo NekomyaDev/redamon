@@ -1607,7 +1607,7 @@ def _build_route_exposure_data_from_graph(domains, user_id: str, project_id: str
                 """
                 MATCH (f:JsReconFinding {user_id: $uid, project_id: $pid, finding_type: 'js_file'})
                       -[:HAS_ENDPOINT]->(e:Endpoint)
-                WHERE e.path IS NOT NULL AND e.endpoint_type IS NOT NULL
+                WHERE NOT f:Muted AND e.path IS NOT NULL AND e.endpoint_type IS NOT NULL
                 RETURN f.source_url AS source_js, e.baseurl AS base, e.path AS path,
                        coalesce(e.method, 'GET') AS method, e.endpoint_type AS kind,
                        e.category AS category, e.path_template AS template
