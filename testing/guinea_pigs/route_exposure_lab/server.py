@@ -649,11 +649,23 @@ def _serve_tls() -> None:
     cert, key = "/srv/tls/cert.pem", "/srv/tls/key.pem"
     if not (os.path.exists(cert) and os.path.exists(key)):
         return
-    server = ThreadingHTTPServer(("0.0.0.0", 443), Handler)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
-    server.socket = ctx.wrap_socket(server.socket, server_side=True)
-    server.serve_forever()
+
+    class _TLSServer(ThreadingHTTPServer):
+        # A wrapped listening socket handshakes inside accept(), on the one serving
+        # thread, so a burst of parallel clients (httpx verify) times some out at
+        # random. Handshaking in the worker thread keeps the lab deterministic.
+        daemon_threads = True
+
+        def finish_request(self, request, client_address):
+            try:
+                request = ctx.wrap_socket(request, server_side=True)
+            except (ssl.SSLError, OSError):
+                return
+            super().finish_request(request, client_address)
+
+    _TLSServer(("0.0.0.0", 443), Handler).serve_forever()
 
 
 def main() -> None:
