@@ -149,6 +149,17 @@ class _Session:
                              "category": "api", "sources": ["route_exposure"], "creator": "resource_enum",
                              "openapi_security": None, "openapi_tags": None, "declared_only": None,
                              "discovery_status": None})
+        elif "finding_type: 'js_file'" in cypher:
+            bundle = "https://www.alpha.test/static/app.js"
+            for kind, path in (("route", "/admin/dashboard"), ("rest", "/api/admin/stats"),
+                               ("rest", "/api/public/news"), ("graphql", "/graphql")):
+                rows.append({"source_js": bundle, "base": "https://www.alpha.test", "path": path,
+                             "method": "GET", "kind": kind, "category": "api", "template": None})
+            rows.append({"source_js": "https://www.old.test/x.js", "base": "https://www.old.test",
+                         "path": "/api/stale", "method": "GET", "kind": "rest", "category": "api",
+                         "template": None})
+            rows.append({"source_js": "upload://bundle.js", "base": "upload", "path": "/api/up",
+                         "method": "GET", "kind": "rest", "category": "api", "template": None})
         elif "USES_TECHNOLOGY" in cypher:
             rows.append({"url": "https://www.alpha.test", "technologies": ["Spring Boot", "Java:17"]})
         elif "form_input_names" in cypher:
@@ -476,6 +487,19 @@ class TestRouteExposureBuilder:
         route = corpus.routes[("https://www.alpha.test", "/api/v1/orders/1", "GET")]
         assert route.generated_by == "version"
         assert route.variant_of == "/api/v2/orders/1"
+
+    def test_js_recon_endpoints_come_back_with_their_bundle_in_scope_only(self, graph):
+        eps = self.build()["js_recon"]["endpoints"]
+        assert {(e["type"], e["path"]) for e in eps} == {
+            ("route", "/admin/dashboard"), ("rest", "/api/admin/stats"), ("rest", "/api/public/news")}
+        assert all(e["source_js"] == "https://www.alpha.test/static/app.js" for e in eps)
+        assert eps[1]["resolved_url"] == "https://www.alpha.test/api/admin/stats"
+
+    def test_a_partial_run_tags_the_client_gated_api_as_a_full_run_does(self, graph):
+        from recon.route_exposure import harvest
+        corpus = harvest.harvest(self.build(), routers=True)     # as the scanner calls it
+        assert corpus.routes[("https://www.alpha.test", "/api/admin/stats", "GET")].client_gated
+        assert not corpus.routes[("https://www.alpha.test", "/api/public/news", "GET")].client_gated
 
     def test_no_roots_reads_nothing(self, graph):
         data = gb._build_route_exposure_data_from_graph([], "u1", "p1", settings={})

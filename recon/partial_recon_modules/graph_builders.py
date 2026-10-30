@@ -1478,10 +1478,11 @@ def _build_route_exposure_data_from_graph(domains, user_id: str, project_id: str
                                           settings: dict = None, domain_groups: list = None) -> dict:
     """Build recon_data for the route exposure scan from the existing graph.
 
-    The scanner reads three sections (recon/route_exposure/harvest.py): the
+    The scanner reads four sections (recon/route_exposure/harvest.py): the
     probed base URLs with their page class and technologies (http_probe.by_url),
     the enumerated routes with their methods, category, sources and OpenAPI
-    metadata (resource_enum.by_base_url), and the run's scope (subdomains,
+    metadata (resource_enum.by_base_url), JS recon's endpoints with the bundle
+    each came from (js_recon.endpoints), and the run's scope (subdomains,
     metadata). A declared-only route that is not GET or HEAD is never read: a
     GET consumer must not request it. Scope is graph_url_scope, as for the
     other builders; ``subdomains`` is left for the caller, which adds the typed
@@ -1596,5 +1597,34 @@ def _build_route_exposure_data_from_graph(domains, user_id: str, project_id: str
                 # A discovery tool's 401/403 is the seen_denied hint.
                 if isinstance(status, int) and status in (401, 403):
                     entry["status_code"] = status
+
+            # JS recon's endpoints, rebuilt as its endpoint list with the bundle each
+            # came from: harvest tags an API client_gated when the bundle defining a
+            # router route calls it, and only the bundle -> endpoint edges keep that
+            # pairing in the graph.
+            js_endpoints = recon_data.setdefault("js_recon", {}).setdefault("endpoints", [])
+            result = session.run(
+                """
+                MATCH (f:JsReconFinding {user_id: $uid, project_id: $pid, finding_type: 'js_file'})
+                      -[:HAS_ENDPOINT]->(e:Endpoint)
+                WHERE e.path IS NOT NULL AND e.endpoint_type IS NOT NULL
+                RETURN f.source_url AS source_js, e.baseurl AS base, e.path AS path,
+                       coalesce(e.method, 'GET') AS method, e.endpoint_type AS kind,
+                       e.category AS category, e.path_template AS template
+                """,
+                uid=user_id, pid=project_id,
+            )
+            for record in result:
+                base = record["base"]
+                if (record["kind"] not in ("route", "rest") or not isinstance(base, str)
+                        or not base.startswith(("http://", "https://")) or not keep(url_host(base))):
+                    continue
+                js_endpoints.append({
+                    "type": record["kind"], "path": record["path"], "method": record["method"],
+                    "category": record["category"] or "endpoint",
+                    "resolved_url": base.rstrip("/") + record["path"],
+                    "source_js": record["source_js"] or "",
+                    "parameterized": record["template"] is not None,
+                })
 
     return recon_data
