@@ -113,8 +113,8 @@
    "sha256": "2ce75f90a7753875de5a8341c5cdce65a74b7a8b3178a8f05e7689e31cf75bf1"
   },
   "all_on/exploitation/access_control": {
-   "chars": 52969,
-   "sha256": "8d129dde525953db7e345affebe54245a3467a50d044346ff88c97009ca053df"
+   "chars": 53542,
+   "sha256": "81d39610e450fe5321a8e057b2ee6d428577dcf127f58e8af3949630425da21a"
   },
   "all_on/exploitation/brute_force_credential_guess": {
    "chars": 16817,
@@ -169,8 +169,8 @@
    "sha256": "2ce75f90a7753875de5a8341c5cdce65a74b7a8b3178a8f05e7689e31cf75bf1"
   },
   "all_on/informational/access_control": {
-   "chars": 52969,
-   "sha256": "8d129dde525953db7e345affebe54245a3467a50d044346ff88c97009ca053df"
+   "chars": 53542,
+   "sha256": "81d39610e450fe5321a8e057b2ee6d428577dcf127f58e8af3949630425da21a"
   },
   "all_on/informational/brute_force_credential_guess": {
    "chars": 16817,
@@ -711,15 +711,15 @@
    "sha256": "3023a33eb37f82f190387f37516e1240eecd9a79ae285fc3b4fdce53ed6c4941"
   },
   "all_on/access_control": {
-   "chars": 52921,
+   "chars": 53494,
    "parts": [
     "ae1601af67b9721efea54c5710dc87695f630df2c4fb9876b4eae972cba3c852",
     "b78254a88187d33c324e2ddcae89d340c080addc79798a26965ce1c006d4126f",
     "51f3fbea441016189ecdb508973844b17e2998d44c4ec581e27a37207ac5952d",
     "1137e12937c276d7e0e229bd99a8894717003a48856a5fea94855882963a62d8",
-    "0b621c118982741ca084adb206f0875183a43750cf104a38567750b0956e2926"
+    "5693c9800d5fbdb427587911d924108d051ece2357e2be5241419e368be96868"
    ],
-   "sha256": "4fd8bf1fb2195204472e0fa040ae13f5319be34f369add0e31f7cd2c16e4860a"
+   "sha256": "425df47aafece292f4db71d79f35c741ddd5895aba4701c3ebea54a9a97bcf0c"
   },
   "all_on/brute_force_credential_guess": {
    "chars": 16769,

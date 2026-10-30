@@ -335,3 +335,17 @@ def test_the_browser_part_proves_each_v2_lead_its_own_way():
     # Client-side gating: an anonymous render, then the pair; a 401 API is correct, not a finding.
     assert "execute_playwright, which never carries the session" in flat
     assert "client-side hiding with server-side enforcement is correct" in flat
+
+
+def test_the_browser_part_finds_the_hidden_pages_in_the_graph_never_by_guessing():
+    """REGRESSION (AG16-17, first run): told only to open "the router page that calls the
+    lead's API", the agent guessed /admin from /api/admin/stats, got the server's redirect
+    to the login page and never rendered the real client-side page. The pages recon read
+    from the same bundle are in the graph; B4 now reads them first."""
+    flat = " ".join(_new_parts()["browser"].split())
+    assert "v.path AS path" in flat
+    assert ("MATCH (f:JsReconFinding {finding_type:'js_file'})-[:HAS_ENDPOINT]->"
+            "(api:Endpoint {path:'<path>'})") in flat
+    assert "MATCH (f)-[:HAS_ENDPOINT]->(page:Endpoint {endpoint_type:'route'})" in flat
+    assert "Never guess a page from the API's path." in flat
+    assert "go to each page from step 1" in flat

@@ -584,8 +584,8 @@ MATCH (v:Vulnerability {source:'route_exposure'})
 WHERE v.needs_agent_confirmation = true AND NOT (:ChainFinding)-[:CONFIRMS]->(v)
   AND (v.exposure_kind IN ['cors_misconfig', 'auth_cacheable']
        OR (v.exposure_kind = 'anonymous_access' AND v.route_class = 'client_gated'))
-RETURN v.id AS id, v.exposure_kind AS kind, v.matched_at AS url, v.anon_status AS anon,
-       v.authed_status AS authed, v.cors_variants AS cors_variants,
+RETURN v.id AS id, v.exposure_kind AS kind, v.matched_at AS url, v.path AS path,
+       v.anon_status AS anon, v.authed_status AS authed, v.cors_variants AS cors_variants,
        v.cache_signals AS cache_signals, v.sensitive_fields AS fields, v.leak_signals AS leaks
 ORDER BY v.exposure_kind, v.id
 LIMIT 50
@@ -622,12 +622,22 @@ AND a cache hit shows (Age above 0, or X-Cache / CF-Cache-Status HIT). Your own 
 only; never send PURGE; never reuse a buster.
 
 **B4. Client-side-only gating (anonymous_access, route_class client_gated).**
-1. execute_playwright, which never carries the session: open the site root, then go to
-   the hidden page (the lead's url when it is a page, or the router page that calls the
-   lead's API), and print only the paths of the fetch/XHR requests it fires.
-2. Each API path it fires, and the lead's url when it is itself an API, gets the L2 pair.
-3. Proof: the API answers anonymously with the content it gives logged in.
-4. A hidden page whose API answers 401 anonymously is NOT a finding: client-side hiding
+1. Find the hidden pages. A client_gated lead that is an API was tagged because a bundle
+   that defines client-side router pages also calls it; those pages are in the graph,
+   linked from the same bundle (put the lead's `path` in):
+   ```cypher
+   MATCH (f:JsReconFinding {finding_type:'js_file'})-[:HAS_ENDPOINT]->(api:Endpoint {path:'<path>'})
+   MATCH (f)-[:HAS_ENDPOINT]->(page:Endpoint {endpoint_type:'route'})
+   WHERE page.baseurl = api.baseurl
+   RETURN DISTINCT page.baseurl + page.path AS page
+   LIMIT 10
+   ```
+   Never guess a page from the API's path. No row, and the lead is itself a page: use its url.
+2. execute_playwright, which never carries the session: open the site root, then go to each
+   page from step 1, and print, per page, only the paths of the fetch/XHR requests it fires.
+3. Each API path a page fires, and the lead's url when it is itself an API, gets the L2 pair.
+4. Proof: the API answers anonymously with the content it gives logged in.
+5. A hidden page whose API answers 401 anonymously is NOT a finding: client-side hiding
    with server-side enforcement is correct. Record nothing for it; list it as rejected.
 
 **B5. Record, then verify,** under the contract below: one `vulnerability_confirmed`
