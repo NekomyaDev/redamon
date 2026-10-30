@@ -41,6 +41,9 @@ class Route:
     declared_only: bool = False
     js_only: bool = False
     router: bool = False
+    #: An API the bundle defining a client-side router route calls under that route's
+    #: first segment (/admin/dashboard -> /api/admin/stats): hidden only by the client.
+    client_gated: bool = False
     #: "get" (one GET), "backup" (HEAD then a Range read) or "head" (HEAD only)
     request: str = "get"
     score: int = 0
@@ -234,8 +237,20 @@ def _read_resource_enum(corpus: Corpus, combined_result: dict) -> None:
                 _note_api_prefix(corpus, base, path)
 
 
+_API_LEAD = re.compile(r"^(api|v\d{1,2})$", re.I)
+
+
+def _head_segment(path: str, *, skip_api: bool = False) -> str:
+    segs = [s.lower() for s in (path or "").split("/") if s]
+    while skip_api and segs and _API_LEAD.match(segs[0]):
+        segs = segs[1:]
+    return segs[0] if segs else ""
+
+
 def _read_js_recon(corpus: Corpus, combined_result: dict, *, routers: bool) -> None:
     endpoints = (combined_result.get("js_recon") or {}).get("endpoints") or []
+    router_heads: dict = {}
+    calls: dict = {}
     for endpoint in endpoints if isinstance(endpoints, list) else []:
         if not isinstance(endpoint, dict) or endpoint.get("parameterized"):
             continue
@@ -256,6 +271,18 @@ def _read_js_recon(corpus: Corpus, combined_result: dict, *, routers: bool) -> N
         # A route another source also saw is merged: it is no longer js_only.
         if corpus.add(route):
             _note_api_prefix(corpus, base, path)
+        source = str(endpoint.get("source_js") or "")
+        if is_router:
+            head = _head_segment(path)
+            if head:
+                router_heads.setdefault(source, set()).add(head)
+        else:
+            calls.setdefault(source, []).append(route.key)
+    for source, heads in router_heads.items():
+        for key in calls.get(source, []):
+            route = corpus.routes.get(key)
+            if route is not None and _head_segment(route.path, skip_api=True) in heads:
+                route.client_gated = True
 
 
 def _resolve(endpoint: dict) -> str:

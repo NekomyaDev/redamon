@@ -49,3 +49,17 @@ def test_two_groups_stay_in_their_own_hosts_with_their_own_caps():
         assert any(f["path"] == "/internal/users/export" for f in out["findings"])
     assert {f["baseurl"] for f in out_a["findings"]} == {a.base}
     assert {f["baseurl"] for f in out_b["findings"]} == {b.base}
+
+
+def test_cross_host_never_crosses_scope_groups():
+    """Group A's hit path is never tried on group B's host, even with cross-host on and
+    both hosts sharing a title: each group's run knows only its own hosts."""
+    landing = (200, {"Content-Type": "text/html"},
+               b"<html><head><title>Same</title></head><body>" + b"x " * 40 + b"</body></html>")
+    with FakeApp({**ROUTES, "/": landing}) as a, FakeApp({**ROUTES, "/": landing}, host="127.0.0.2") as b:
+        shared = settings(TARGET_IPS=["127.0.0.1", "127.0.0.2"], ROUTE_EXPOSURE_CROSS_HOST=True)
+        group_a = corpus(a.base, endpoints=ENDPOINTS)
+        group_a["http_probe"]["by_url"][a.base]["title"] = "Same"
+        out_a = run_route_exposure_isolated(group_a, shared)["route_exposure"]
+    assert len(b.hits) == 0
+    assert out_a["summary"]["cross_host_routes"] == 0

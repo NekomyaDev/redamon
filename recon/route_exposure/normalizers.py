@@ -29,9 +29,11 @@ ARTIFACT_KINDS = frozenset(signatures.KINDS)
 
 
 def build_finding(obs, *, kind: str, route_class: str, auth_expected_by: list,
-                  confidence: float, sig: dict | None = None, content=None) -> dict:
+                  confidence: float, sig: dict | None = None, content=None,
+                  extra: dict | None = None) -> dict:
     """One flat finding. ``content`` is the Signals the kind was decided on
-    (the anonymous answer's unless the logged-in one carried the data)."""
+    (the anonymous answer's unless the logged-in one carried the data); ``extra``
+    carries a v2 rider's or the git walk's flat fields."""
     route = obs.route
     content = content if content is not None else obs.anon_signals
     candidate = kind in CANDIDATE_TYPES
@@ -73,6 +75,9 @@ def build_finding(obs, *, kind: str, route_class: str, auth_expected_by: list,
         finding["authed_status"] = int(obs.authed_status)
     if obs.bodies_match is not None:
         finding["bodies_match"] = bool(obs.bodies_match)
+    for key, value in (extra or {}).items():
+        if value not in (None, "", [], {}):
+            finding[key] = value
     return finding
 
 

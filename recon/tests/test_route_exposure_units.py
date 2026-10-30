@@ -933,3 +933,61 @@ def test_cache_rider_flags_a_cacheable_hit_and_skips_vary_cookie():
     assert riders.cache_rider(varied) == {}
     no_layer = _answer(headers={"Cache-Control": "public, max-age=600"})
     assert riders.cache_rider(no_layer) == {}
+
+
+def test_catalog_shapes_it_does_not_understand_yield_nothing():
+    assert catalogs._concrete("") is None and catalogs._concrete("relative/x") is None
+    assert catalogs._concrete("/" + "a" * 300) is None
+    assert catalogs._from_actuator_mappings({"contexts": []}) == []
+    assert catalogs._from_actuator_mappings({"contexts": {"a": {"mappings": {"dispatcherServlets": []}}}}) == []
+    assert catalogs._from_openapi({"paths": []}) == []
+
+
+def test_catalog_openapi_server_and_base_path_prefix_the_routes():
+    v3 = {"servers": [{"url": "https://api.lab.invalid/v2"}], "paths": {"/orders": {}}}
+    assert catalogs.parse(json.dumps(v3).encode(), "application/json") == ["/v2/orders"]
+    v2 = {"basePath": "/api/", "paths": {"/users": {}}}
+    assert catalogs.parse(json.dumps(v2).encode(), "application/json") == ["/api/users"]
+
+
+def test_catalog_rails_skips_lines_without_a_path():
+    body = b"Prefix Verb URI Pattern\nhealth GET /health(.:format)\n/rails/info"
+    assert "/health" in catalogs.parse(body, "text/html")
+
+
+class _Down:
+    def send(self, *a, **k):
+        return None
+
+    def auth_headers(self, url):
+        return {}
+
+
+def test_git_walk_degrades_to_no_proof_on_every_failure():
+    root = BASE + "/.git"
+    assert gitwalk.walk(_Down(), root, b"ref: refs/heads/main\n") == {}      # the ref never answers
+    assert gitwalk.walk(_Down(), root, b"no ref here") == {}                 # nothing to follow
+    assert gitwalk.walk(_Down(), root, b"a" * 40) == {}                      # the object never answers
+    assert gitwalk._inflate(b"not zlib at all") == b""
+
+    class _Boom(_Down):
+        def send(self, *a, **k):
+            raise RuntimeError("socket")
+    assert gitwalk.walk(_Boom(), root, b"a" * 40) == {}
+
+
+def test_git_walk_commit_without_a_tree_line_keeps_only_the_proof():
+    commit = "e" * 40
+    probe = _FakeProbe({BASE + f"/.git/objects/{commit[:2]}/{commit[2:]}": _answer(content=zlib_compress(b"commit 5\x00hello"))})
+    assert gitwalk.walk(probe, BASE + "/.git", commit.encode()) == {"git_walk_proof": "head>ref>commit"}
+
+
+def test_riders_guard_their_inputs():
+    assert riders._registrable("10.0.0.5") == "10.0.0.5" and riders._registrable("app.lab.invalid") == "lab.invalid"
+    route = Route(BASE, "/api/profile")
+    assert riders.cors_rider(_FakeProbe({}, auth={"Authorization": "x"}), route, enabled=False) == {}
+    assert riders.cors_rider(_FakeProbe({}), route) == {}                           # no profile, no rider
+    assert riders.cors_rider(_FakeProbe({}, auth={"Authorization": "x"}), route) == {}  # nothing answered
+    assert riders.cache_rider(None) == {} and riders.cache_rider(_answer(), enabled=False) == {}
+    shared = _answer(headers={"Cache-Control": "s-maxage=300", "X-Cache": "MISS"})
+    assert "s-maxage" in riders.cache_rider(shared)["cache_signals"]

@@ -46,6 +46,12 @@ def _route(base: str, path: str, generated_by: str, *, variant_of: str = "",
                  generated_by=generated_by, variant_of=variant_of, request=request)
 
 
+def make_route(base: str, path: str, generated_by: str, *, variant_of: str = "",
+               request: str = "get") -> Route:
+    """A generated route, for the scanner's probe-time generators (catalog, cross-host)."""
+    return _route(base, path, generated_by, variant_of=variant_of, request=request)
+
+
 def seed_paths(api_prefixes) -> list:
     """The seed list at the root, then under every API prefix the harvest saw."""
     under_prefixes = [f"{p.rstrip('/')}{s}" for p in sorted(api_prefixes or ())

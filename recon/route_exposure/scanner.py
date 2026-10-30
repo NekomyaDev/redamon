@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from recon.helpers.isolated_result import TopLevelKeys
-from recon.route_exposure import generators, harvest, normalizers, prober, ranking, verdict
+from recon.route_exposure import catalogs, generators, harvest, normalizers, prober, ranking, seeds, verdict
 
 SOURCE = "route_exposure"
 ROUTE_EXPOSURE_JEV_HOOKS = ("route_privacy_rank", "route_exposure_wall", "route_exposure_assess")
@@ -180,12 +180,84 @@ def _observe_all(routes: list, probe: prober.Prober, cfg: dict) -> list:
         return list(pool.map(one, routes))
 
 
+def _catalog_routes(observations: list, corpus, cfg: dict) -> tuple:
+    """Routes an open catalog lists (plan §5.2), one follow-up round only: what the
+    round's own probes find is never followed again. ``(routes, catalogs_followed)``."""
+    if not cfg.get("follow_catalogs"):
+        return [], 0
+    made: list = []
+    per_host: dict = {}
+    followed = 0
+    for obs in observations:
+        is_catalog = (obs.signature or {}).get("kind") == "route_catalog" or obs.api_spec
+        if not is_catalog or obs.anon is None:
+            continue
+        paths = catalogs.parse(obs.anon.content, obs.anon.header("content-type"))
+        if paths:
+            followed += 1
+        base = obs.route.baseurl
+        for path in paths:
+            if per_host.get(base, 0) >= seeds.CAP_CATALOG_ROUTES:
+                break
+            route = generators.make_route(base, path, "catalog")
+            if corpus.add(route):
+                made.append(route)
+                per_host[base] = per_host.get(base, 0) + 1
+    return made, followed
+
+
+def _titles(combined_result: dict) -> dict:
+    """{base URL: page title} of each host's root page, from http_probe."""
+    out: dict = {}
+    by_url = (combined_result.get("http_probe") or {}).get("by_url") or {}
+    for url, entry in by_url.items():
+        if not isinstance(entry, dict):
+            continue
+        full = str(entry.get("url") or url)
+        if (urlsplit(full).path or "/") in ("", "/") and entry.get("title"):
+            out.setdefault(harvest.base_of(full), str(entry["title"]).strip())
+    return out
+
+
+def _cross_host_routes(observations: list, corpus, combined_result: dict, cfg: dict, guard) -> list:
+    """Paths that hit on one host, tried on the run's other hosts that share its
+    page title or technology set (plan §5.2). Each keeps its source route's request
+    shape, so an archive is still read with HEAD and Range only. Off by default."""
+    if not cfg.get("cross_host"):
+        return []
+    shape = {(o.route.baseurl, o.route.path): o.route.request for o in observations}
+    hit: dict = {}
+    for finding in verdict.assess(observations, cfg)["findings"]:
+        hit.setdefault(finding["baseurl"], set()).add(finding["path"])
+    titles = _titles(combined_result)
+    made: list = []
+    for base_a in sorted(hit):
+        for base_b in corpus.bases:
+            if base_b == base_a:
+                continue
+            same_title = titles.get(base_a) and titles.get(base_a) == titles.get(base_b)
+            same_tech = corpus.technologies.get(base_a) and \
+                corpus.technologies.get(base_a) == corpus.technologies.get(base_b)
+            if not (same_title or same_tech):
+                continue
+            for path in sorted(hit[base_a]):
+                if len(made) >= seeds.CAP_CROSS_HOST:
+                    return made
+                route = generators.make_route(base_b, path, "cross_host",
+                                              request=shape.get((base_a, path), "get"))
+                if guard(route.url) and corpus.add(route):
+                    made.append(route)
+    return made
+
+
 def _run(combined_result: dict, settings: dict, started: str) -> dict:
     from recon.helpers import circuit_breaker as cb
 
     cfg = config(settings)
     scope = cb.scope((), label="RouteExposure", unit="host(s)")
-    corpus = harvest.harvest(combined_result)
+    # Client-side router routes are harvested so a page hidden only by the browser,
+    # and the APIs it calls, are requested like any other route (plan §5.2).
+    corpus = harvest.harvest(combined_result, routers=True)
     harvested = len(corpus.routes)
     generated = generators.generate(corpus, cfg)
     guard = build_guard(combined_result, settings)
@@ -198,15 +270,25 @@ def _run(combined_result: dict, settings: dict, started: str) -> dict:
     probe = prober.Prober(settings, guard=guard, timeout=cfg["timeout"], rps=cfg["rps"],
                           breaker_scope=scope, roe_excluded=_roe_excluded(settings))
     observations = _observe_all(selected, probe, cfg)
+    # One follow-up round: the routes open catalogs list, and the paths that hit tried
+    # on the sibling hosts. Never recursive.
+    catalog_routes, catalogs_followed = _catalog_routes(observations, corpus, cfg)
+    cross_routes = _cross_host_routes(observations, corpus, combined_result, cfg, guard)
+    follow_up = [r for r in catalog_routes + cross_routes if guard(r.url)]
+    for route in follow_up:
+        ranking.score(route)
+    if follow_up:
+        observations += _observe_all(follow_up, probe, cfg)
     assessed = verdict.assess(observations, cfg)
     findings = assessed["findings"]
 
     dropped = dict(assessed["dropped"], unsafe=corpus.unsafe)
     summary = {
-        "routes_harvested": harvested, "routes_generated": len(generated),
-        "routes_requested": len(selected), "budget_cut": cut, "hosts": hosts,
+        "routes_harvested": harvested, "routes_generated": len(generated) + len(follow_up),
+        "routes_requested": len(selected) + len(follow_up), "budget_cut": cut, "hosts": hosts,
         "out_of_scope": out_of_scope, "dropped": dropped,
         "logged_in_compared": assessed["logged_in_compared"], "requests_sent": probe.sent,
+        "catalogs_followed": catalogs_followed, "cross_host_routes": len(cross_routes),
         "started_at": started, "finished_at": _now(),
     }
     result = normalizers.build_result(findings, endpoint_status=assessed["endpoint_status"],

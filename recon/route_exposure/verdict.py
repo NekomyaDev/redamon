@@ -16,7 +16,7 @@ from typing import Optional
 from urllib.parse import urlsplit
 
 from recon.helpers import catchall
-from recon.route_exposure import normalizers, prober as prober_mod, seeds, signals, signatures
+from recon.route_exposure import gitwalk, normalizers, prober as prober_mod, riders, seeds, signals, signatures
 from recon.route_exposure.harvest import Route, has_extension
 
 try:
@@ -62,6 +62,10 @@ class Observation:
     vary_auth: bool = False
     api_spec: bool = False
     snippet: str = ""
+    # v2 riders and proofs (plan §5.7, §5.8)
+    cors_variants: list = field(default_factory=list)
+    cache_signals: list = field(default_factory=list)
+    git_walk: dict = field(default_factory=dict)
 
     @property
     def anon_status(self) -> Optional[int]:
@@ -170,6 +174,9 @@ def observe(route: Route, probe: prober_mod.Prober, cfg: dict) -> Observation:
             return obs
     if sig is not None:
         obs.signature = sig
+        if (sig["kind"] == "vcs_exposure" and cfg.get("git_walk")
+                and route.path.lower().endswith("/.git/head")):
+            obs.git_walk = gitwalk.walk(probe, url[:-len("/HEAD")], anon.content)
         return obs
 
     _logged_in(obs, probe, cfg)
@@ -202,7 +209,24 @@ def observe(route: Route, probe: prober_mod.Prober, cfg: dict) -> Observation:
     if obs.drop and obs.drop != "catch_all":
         obs.catch_all_check = "n/a"
     _check_logged_in_content(obs, probe)
+    _riders(obs, probe, cfg)
     return obs
+
+
+def _riders(obs: Observation, probe: prober_mod.Prober, cfg: dict) -> None:
+    """The CORS and cache riders, only on a logged-in 2xx that is personalised (the
+    anonymous answer was denied or differs) and carries a leak signal (plan §5.7)."""
+    if not (cfg.get("cors_rider") or cfg.get("cache_rider")) or not obs.authed_usable:
+        return
+    sig = obs.authed_signals
+    if not (sig.leak_signals or sig.sensitive_fields or sig.pii_others):
+        return
+    if not (obs.anon_status in DENIED or obs.drop == "denied" or obs.bodies_match is False):
+        return
+    if cfg.get("cors_rider"):
+        obs.cors_variants = riders.cors_rider(probe, obs.route).get("cors_variants", [])
+    if cfg.get("cache_rider"):
+        obs.cache_signals = riders.cache_rider(obs.authed).get("cache_signals", [])
 
 
 def _logged_in(obs: Observation, probe: prober_mod.Prober, cfg: dict) -> None:
@@ -258,7 +282,7 @@ def route_class(route: Route) -> str:
     words = {t for seg in route.path.split("/") for t in seeds.tokens(seg)}
     if route.generated_by == "version":
         return "old_version"
-    if route.router:
+    if route.router or route.client_gated:
         return "client_gated"
     if words & {"debug", "actuator", "metrics", "management", "health", "pprof", "trace",
                 "console", "prometheus", "status", "env"}:
@@ -374,7 +398,7 @@ def assess(observations: list, cfg: dict) -> dict:
             emit(normalizers.build_finding(obs, kind=obs.signature["kind"],
                                            route_class=route_class(route),
                                            auth_expected_by=[], confidence=0.95,
-                                           sig=obs.signature))
+                                           sig=obs.signature, extra=obs.git_walk))
             continue
         expected = _auth_expected(obs, neighbours.get(route.key, []))
         kinds = []
@@ -397,6 +421,17 @@ def assess(observations: list, cfg: dict) -> dict:
                                            auth_expected_by=expected,
                                            confidence=0.6 if source.sensitive_fields else 0.5,
                                            content=source))
+        # v2 riders: leads only; the agent proves the cross-origin read or the cache hit.
+        if obs.cors_variants:
+            emit(normalizers.build_finding(obs, kind="cors_misconfig", route_class=route_class(route),
+                                           auth_expected_by=expected, confidence=0.7,
+                                           content=obs.authed_signals,
+                                           extra={"cors_variants": list(obs.cors_variants)}))
+        if obs.cache_signals:
+            emit(normalizers.build_finding(obs, kind="auth_cacheable", route_class=route_class(route),
+                                           auth_expected_by=expected, confidence=0.6,
+                                           content=obs.authed_signals,
+                                           extra={"cache_signals": list(obs.cache_signals)}))
         if (kinds and route.generated_by in NEW_ENDPOINT_GENERATORS and _ok(obs.anon_status)
                 and obs.anon.content and not is_artifact_path(route.path)):
             new_endpoints.append({"baseurl": route.baseurl, "path": route.path, "method": "GET",

@@ -152,3 +152,18 @@ def test_numeric_out_of_bounds_values_are_clamped():
                      ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST=1, ROUTE_EXPOSURE_MAX_RPS=10_000,
                      ROUTE_EXPOSURE_WORKERS=500, ROUTE_EXPOSURE_TIMEOUT=0)
     assert result["summary"]["routes_requested"] == 10   # the per-host floor of the bounds
+
+
+def test_every_route_exposure_setting_has_an_effect_case():
+    """A new ROUTE_EXPOSURE_* default ships with a test proving its effect, here or in
+    test_route_exposure_v2.py (the v2 generators and riders)."""
+    from pathlib import Path
+
+    from recon.project_settings import DEFAULT_SETTINGS
+    here = Path(__file__).parent
+    text = (here / "test_route_exposure_settings_effect.py").read_text() + \
+        (here / "test_route_exposure_v2.py").read_text()
+    keys = [k for k in DEFAULT_SETTINGS if k.startswith("ROUTE_EXPOSURE_") and "_JEV_" not in k]
+    assert keys
+    missing = [k for k in keys if k != "ROUTE_EXPOSURE_ENABLED" and f"{k}=" not in text and f'"{k}"' not in text]
+    assert not missing, f"no effect test names {missing}"

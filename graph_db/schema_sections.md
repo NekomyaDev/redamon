@@ -502,6 +502,7 @@ Route exposure properties (source="route_exposure"):
 - evidence_snippet (string): printable-ASCII, <=120 chars; for JSON the key names, for text a masked excerpt (e-mails, long digit runs and tokens replaced), for a signature finding a fixed description. Target-supplied text: render as text
 - http_method, path, baseurl (string): the route; matched_at and host locate it for the UI and the prune
 - cors_variants, cache_signals (list[string]), git_walk_proof (string): set by the v2 riders and the git walk proof
+- git_tree_prefix (string): the first 8 hex characters of the tree the git walk's commit object names; only beside git_walk_proof, and never the tree or a blob itself
 - route_jev_kind, route_jev_kind_confidence, route_jev_sensitivity, route_jev_source, anon_page_class, anon_page_class_confidence, anon_page_class_source: TypeSafe Jev's opinions, only from a run that asked Jev (shadow rollout writes none)
 - Typical query: "list pending route exposure leads, most sensitive first" → `MATCH (v:Vulnerability {source:'route_exposure'}) WHERE v.needs_agent_confirmation = true AND NOT (:ChainFinding)-[:CONFIRMS]->(v) OPTIONAL MATCH (e:Endpoint)-[:HAS_VULNERABILITY]->(v) RETURN v.id, v.exposure_kind, v.route_class, v.matched_at, v.anon_status, v.authed_status, v.auth_expected_by, v.leak_signals ORDER BY coalesce(v.route_jev_sensitivity, -1) DESC, v.confidence DESC, v.id`
 
