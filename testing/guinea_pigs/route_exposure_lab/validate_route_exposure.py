@@ -167,6 +167,9 @@ def _wait(mcp, project_id: str, timeout_s: int = 3600) -> dict:
         state = str(status.get("status") or status.get("state") or "").lower()
         if state in ("completed", "complete", "done", "finished", "error", "failed", "stopped"):
             return status
+        # A restarted orchestrator forgets its run and reports idle with the last run.
+        if state == "idle" and (status.get("lastRun") or {}).get("completed"):
+            return {**status, "status": status["lastRun"].get("status") or "completed"}
         time.sleep(15)
     raise SystemExit("the scan did not finish in time")
 
@@ -213,6 +216,29 @@ def verify(name: str, project_id: str) -> int:
     summary = rex.get("summary") or {}
     findings = rex.get("findings") or []
     report.append(f"- summary: {json.dumps({k: summary.get(k) for k in ('routes_harvested', 'routes_generated', 'routes_requested', 'budget_cut', 'candidates', 'findings', 'requests_sent', 'dropped')})}")
+
+    jev = sc.get("jev") or {}
+    shadow = data.get("jev_shadow") or {}
+    for hook in jev.get("hooks") or []:
+        rec = shadow.get(hook)
+        if not isinstance(rec, dict):
+            failures.append(f"jev_shadow.{hook} missing")
+            continue
+        stats = rec.get("summary") or {}
+        report.append(f"- jev_shadow.{hook}: rollout={rec.get('rollout')} model={rec.get('model')} "
+                      f"decisions={stats.get('decisions')} agreed={stats.get('agreed_pct')}% "
+                      f"fallbacks={stats.get('fallbacks')}")
+        if rec.get("rollout") != "shadow":
+            failures.append(f"jev_shadow.{hook} rollout {rec.get('rollout')!r}, expected 'shadow'")
+        if "fallbacks" in jev and stats.get("fallbacks") != jev["fallbacks"]:
+            failures.append(f"jev_shadow.{hook} fallbacks={stats.get('fallbacks')}, expected {jev['fallbacks']}")
+        if jev.get("fallbacks") == 0 and not re.match(r"^jev-\d+\.\d+\.\d+$", str(rec.get("model"))):
+            failures.append(f"jev_shadow.{hook} model {rec.get('model')!r} is not a Jev model")
+        if jev.get("fallbacks") == 0 and not stats.get("decisions"):
+            failures.append(f"jev_shadow.{hook} recorded no decision")
+    for hook in jev.get("absent") or []:
+        if hook in shadow:
+            failures.append(f"jev_shadow.{hook} exists, but the hook must not run")
 
     got = {(_role_of(f["baseurl"]), f["path"], f["exposure_kind"]): f for f in findings}
     disabled = {k for k, v in (sc.get("settings") or {}).items() if v is False}
@@ -573,8 +599,8 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
         listing = subprocess.run(["docker", "exec", "redamon-agent", "sh", "-c",
                                   f"ls /workspace/{project_id}/{prefix.rsplit('/', 1)[0]} 2>/dev/null || true"],
                                  capture_output=True, text=True).stdout.split()
-        name = prefix.rsplit("/", 1)[-1]
-        found = [f for f in listing if f.startswith(name)]
+        stem = prefix.rsplit("/", 1)[-1]
+        found = [f for f in listing if f.startswith(stem)]
         report.append(f"- workspace {prefix}*: {len(found)} file(s)")
         if not found:
             failures.append(f"no {prefix}* file in the agent workspace")

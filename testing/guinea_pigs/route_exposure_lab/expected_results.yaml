@@ -24,6 +24,9 @@ v1_findings:
   - {role: main, path: /api/v1/orders/42, kind: anonymous_access, fields: {generated_by: version, route_class: old_version, variant_of: /api/v2/orders/42}, expected_by: [version_locked], gen: version}
   - {role: main, path: /api/admin/export, kind: anonymous_access, fields: {generated_by: seed}, expected_by: [siblings_locked], gen: seed}
   - {role: main, path: /api/admin/help, kind: anonymous_access, fields: {confidence: 0.4, auth_expected_by: [path_word]}, gen: found}
+  # A disguised login wall (S18b): only a sign-in form, nothing in its path or title the
+  # deterministic page check reads, so it stays a lead; Jev hook B should call it a wall.
+  - {role: main, path: /internal/portal, kind: anonymous_access, expected_by: [path_word], gen: found}
   - {role: main, path: /api/users/me, kind: sensitive_data, fields: {anon_status: 401, authed_status: 200}, needs_auth: true, gen: found}
   - {role: main, path: /uploads/invoice-1001.pdf, kind: anonymous_access, fields: {route_class: uploaded_content}, needs_auth: true, needs: keep_docs, gen: found}
   - {role: main, path: /.git/HEAD, kind: vcs_exposure, fields: {severity: high}, gen: vcs}
@@ -132,6 +135,12 @@ scenarios:
                     routeExposureFollowCatalogs: false, routeExposureGitWalk: false,
                     routeExposureCorsRider: false, routeExposureCacheRider: false,
                     routeExposureCrossHost: true}}
+  # v3 (§22.7): v2-A's settings with AI in Pipeline and the three Jev hooks, all in shadow.
+  # The route rows are v2-A's; `jev` names the shadow records the run must (or must not) hold.
+  v3-A: {phase: v2, roles: [main, twin, hostile], auth: bearer, needs: [keep_docs],
+         settings: {aiInPipeline: true, routeExposureJevRank: true, routeExposureJevWallCheck: true,
+                    routeExposureJevAssess: true},
+         jev: {hooks: [route_privacy_rank, route_exposure_wall, route_exposure_assess], fallbacks: 0}}
 
 # Agent campaign (plan §23.13): one block per scenario. `confirm` paths need a
 # vulnerability_confirmed CONFIRMS edge at confidence >= 80 from the session;

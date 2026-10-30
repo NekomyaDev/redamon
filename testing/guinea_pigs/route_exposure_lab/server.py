@@ -118,7 +118,8 @@ LANDING = """<!doctype html><html><head><title>Lab Portal</title>
 <h1>Lab Portal</h1>
 <p>Welcome to the lab portal. Read the <a href="/api/admin/help">administrator help</a>,
 the <a href="/openapi.json">API documentation</a> or <a href="/login">sign in</a>.</p>
-<p><a href="/settings">Settings</a> <a href="/config.php">Configuration</a></p>
+<p><a href="/settings">Settings</a> <a href="/config.php">Configuration</a>
+<a href="/internal/portal">Staff area</a></p>
 {uploads}
 </body></html>"""
 
@@ -215,6 +216,16 @@ PHPINFO = """<!DOCTYPE html><html><head><title>phpinfo()</title></head><body><di
 <table><tr><td class="e">System </td><td class="v">Linux lab 6.1</td></tr>
 <tr><td class="e">Server API </td><td class="v">FPM/FastCGI</td></tr></table></div></body></html>"""
 
+# A disguised login wall (plan S18b, Jev hook B): a 200 whose page is only a sign-in form,
+# with nothing in its path or title the deterministic page check reads as a login. The
+# path word makes it a lead, so hook B is asked about it.
+PORTAL = """<!doctype html><html><head><title>Staff area</title></head><body>
+<h1>Staff area</h1><p>Members of staff reach the rota, the payroll documents and the internal
+directory here. Identify yourself with your staff account to continue.</p>
+<form method="post" action="/session"><label>Username <input name="username"></label>
+<label>Password <input name="password" type="password"></label><button>Continue</button></form>
+</body></html>"""
+
 HELP = """<!doctype html><html><head><title>Administrator help</title></head><body>
 <h1>Administrator help</h1><p>This page explains how administrators manage the lab portal:
 how to reset a password, how to export reports, and whom to contact for support. It is public
@@ -279,6 +290,14 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "LabServer/1.0"
     sys_version = ""
+
+    def end_headers(self):
+        # One request per connection on the hostile host: its /reset-conn RST otherwise
+        # took down whatever a client had queued behind it on the same kept-alive
+        # connection, and jsluice's httpx verify lost bundle URLs at random.
+        if ROLE == "hostile":
+            self.send_header("Connection", "close")
+        super().end_headers()
 
     def log_message(self, *args):
         pass
@@ -417,6 +436,8 @@ class Handler(BaseHTTPRequestHandler):
                                    "<input name=user><input name=password type=password></form></body></html>")
         if path in ("/logout", "/account/reset"):
             return self._send(200, "<html><body>done</body></html>")
+        if path == "/internal/portal":
+            return self._send(200, PORTAL)
         if path == "/internal/users/export":
             if flag("close-export"):
                 return deny()
