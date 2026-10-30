@@ -484,6 +484,13 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
             continue
         if not any(r.get("type") == "vulnerability_confirmed" and int(r.get("conf") or 0) >= 80 for r in got):
             failures.append(f"{path}: no vulnerability_confirmed edge at confidence >= 80")
+    for path, kinds in (spec.get("confirm_kinds") or {}).items():
+        # One path can carry several leads (/api/profile: sensitive_data, cors, cache).
+        got_kinds = {r.get("kind") for r in confirmed.get(path, [])
+                     if r.get("type") == "vulnerability_confirmed" and int(r.get("conf") or 0) >= 80}
+        for kind in kinds:
+            if kind not in got_kinds:
+                failures.append(f"{path}: no vulnerability_confirmed edge on its {kind} lead")
     for path in spec.get("reject") or []:
         if path in confirmed:
             failures.append(f"{path} was confirmed but must be rejected")
@@ -550,6 +557,27 @@ def agent_verify(name: str, project_id: str, session_id: str | None = None) -> i
     # Proves the page was really rendered: its sub-resource from the outsider loaded.
     if (spec.get("hits") or {}).get("outsider_widget") and len(outsider) == len(aimed):
         failures.append("the outsider's /widget.js was never loaded (the page was not rendered)")
+
+    main_window = [h for h in hits("main") if h["t"] >= since]
+    for path, least in ((spec.get("hits") or {}).get("origins_min") or {}).items():
+        sent = {h["origin"] for h in main_window if h["path"].split("?", 1)[0] == path and h["origin"]}
+        report.append(f"- main {path}: {len(sent)} distinct Origin header(s) sent")
+        if len(sent) < least:
+            failures.append(f"{path}: {len(sent)} Origin variant(s) sent, at least {least}")
+    for path in (spec.get("hits") or {}).get("anonymous_paths") or []:
+        # The anonymous browser render really reached the hidden page.
+        if not any(h["path"].split("?", 1)[0] == path and not (h["auth"] or h["cookie"] or h["api_key"])
+                   for h in main_window):
+            failures.append(f"no anonymous request reached {path}")
+    for prefix in spec.get("workspace_files") or []:
+        listing = subprocess.run(["docker", "exec", "redamon-agent", "sh", "-c",
+                                  f"ls /workspace/{project_id}/{prefix.rsplit('/', 1)[0]} 2>/dev/null || true"],
+                                 capture_output=True, text=True).stdout.split()
+        name = prefix.rsplit("/", 1)[-1]
+        found = [f for f in listing if f.startswith(name)]
+        report.append(f"- workspace {prefix}*: {len(found)} file(s)")
+        if not found:
+            failures.append(f"no {prefix}* file in the agent workspace")
 
     if spec.get("captures"):
         # The capture store's side of the anonymous replay: a replay row stored with

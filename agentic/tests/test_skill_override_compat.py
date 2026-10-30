@@ -89,7 +89,8 @@ def test_existing_parts_keep_their_factory_hash(key):
 def test_only_the_route_exposure_and_handling_parts_are_new():
     keys = {p.key for s in NEW_PARTS for p in skill_parts.parts_of(s)}
     assert keys - set(FACTORY_SHA256) == {
-        "access_control/route_exposure_leads", "path_traversal/exposed_files", "path_traversal/git_reconstruct",
+        "access_control/route_exposure_leads", "access_control/route_exposure_browser_leads",
+        "path_traversal/exposed_files", "path_traversal/git_reconstruct",
         "path_traversal/validate_secrets", "rce/route_exposure_consoles", "rce/heapdump_analysis",
         "access_control/safe_values", "access_control/safe_state",
         "path_traversal/safe_values", "path_traversal/safe_state"}

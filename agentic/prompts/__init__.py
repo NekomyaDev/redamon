@@ -141,7 +141,9 @@ from .crypto_attack_prompts import CRYPTO_ATTACK_TOOLS
 from .unclassified_prompts import UNCLASSIFIED_EXPLOIT_TOOLS
 
 # Re-export from Broken Access Control / Authorization Bypass prompts
-from .access_control_prompts import ACCESS_CONTROL_TOOLS, ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS
+from .access_control_prompts import (
+    ACCESS_CONTROL_TOOLS, ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS, ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS,
+)
 from .safe_handling_prompts import (
     ACCESS_CONTROL_SAFE_STATE,
     ACCESS_CONTROL_SAFE_VALUES,
@@ -510,6 +512,9 @@ def _build_builtin_skill_workflow_parts(
         if get_setting('ROUTE_EXPOSURE_ENABLED', False):
             parts.append(_seam.resolve_skill_part(
                 "access_control", "route_exposure_leads", ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS))
+            parts.append(_seam.resolve_skill_part(
+                "access_control", "route_exposure_browser_leads",
+                ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS))
         return parts
     elif (attack_path_type == "http_request_smuggling"
             and "http_request_smuggling" in enabled_builtins
@@ -844,6 +849,7 @@ __all__ = [
     "UNCLASSIFIED_EXPLOIT_TOOLS",
     "ACCESS_CONTROL_TOOLS",
     "ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS",
+    "ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS",
     "ACCESS_CONTROL_SAFE_VALUES",
     "ACCESS_CONTROL_SAFE_STATE",
     "PATH_TRAVERSAL_SAFE_VALUES",

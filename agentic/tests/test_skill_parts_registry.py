@@ -67,6 +67,7 @@ EXPECTED = [
     ("access_control", "safe_values", "plain"),
     ("access_control", "safe_state", "plain"),
     ("access_control", "route_exposure_leads", "plain"),
+    ("access_control", "route_exposure_browser_leads", "plain"),
     ("http_request_smuggling", "tools", "plain"),
     ("http_request_smuggling", "zero_cl_step", "plain"),
     ("http_request_smuggling", "expect_step", "plain"),
@@ -114,7 +115,7 @@ def _resolve(constant: str):
 def test_parts_and_order_are_the_published_list():
     got = [(p.skill_id, p.part_id, p.kind) for p in skill_parts.all_parts()]
     assert got == EXPECTED
-    assert len(got) == 57
+    assert len(got) == 58
 
 
 def test_text_is_the_module_constant_itself():

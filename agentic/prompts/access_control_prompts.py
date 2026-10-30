@@ -568,3 +568,68 @@ skill: say the finding stands on its signature.
 you recognise it. If brute_force_credential_guess is enabled and the RoE does not
 forbid brute force, propose it in your final answer. Never try a password here.
 """ + _VALUES_IN_FILES + _RECORD_CONTRACT + _SAFETY_RULES
+
+ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS = """
+## ROUTE EXPOSURE BROWSER LEADS (CORS, cached logged-in pages, client-side-only gating)
+
+Recon's riders flagged logged-in routes whose answers a browser could leak: a CORS
+policy that hands them to another origin, a cache that would serve them to anyone, and
+pages hidden only by the browser. Prove or reject each, all in the INFORMATIONAL phase
+(execute_curl, execute_code, execute_playwright, fs_write). L1 above also returns the
+client_gated leads (route_class `client_gated`): prove those with B4, not with L2-L3.
+
+**B1. Pull them.**
+```cypher
+MATCH (v:Vulnerability {source:'route_exposure'})
+WHERE v.needs_agent_confirmation = true AND NOT (:ChainFinding)-[:CONFIRMS]->(v)
+  AND (v.exposure_kind IN ['cors_misconfig', 'auth_cacheable']
+       OR (v.exposure_kind = 'anonymous_access' AND v.route_class = 'client_gated'))
+RETURN v.id AS id, v.exposure_kind AS kind, v.matched_at AS url, v.anon_status AS anon,
+       v.authed_status AS authed, v.cors_variants AS cors_variants,
+       v.cache_signals AS cache_signals, v.sensitive_fields AS fields, v.leak_signals AS leaks
+ORDER BY v.exposure_kind, v.id
+LIMIT 50
+```
+Copy every `id` exactly. Page with `AND v.id > '<last id>'`.
+
+**B2. CORS (kind cors_misconfig).** Send the logged-in GET once per Origin:
+`https://evil.invalid`, `null`, `https://<host>.evil.invalid` and
+`https://evil<registrable domain>` (for an IP host, `https://evil<ip>`). Each:
+```
+execute_curl  args: -s -D /tmp/rex-<id>-<n>.hdr -o /tmp/rex-<id>-<n>.body -w '%{http_code}' -H 'Origin: <origin>' '<url>'
+              use_session: true
+```
+One execute_code script prints, per origin, only the Access-Control-Allow-Origin and
+Access-Control-Allow-Credentials values and the body's sha256[:8], then removes the files.
+Proof: Access-Control-Allow-Origin echoes the sent origin (or `null`) AND
+Access-Control-Allow-Credentials is `true` AND the lead's `fields` or `leaks` show the
+logged-in body is sensitive. Then write the evidence with fs_write to
+`evidence/cors-<id>.html`: a page that runs `fetch('<url>', {credentials: 'include'})` and
+shows the response length. It is a file, never served, never opened. Reject: a `*` origin
+without credentials, or a body with nothing sensitive.
+
+**B3. Cache (kind auth_cacheable).** Build `<url>?rdmncb=<12 random hex>`, a new one per
+lead and never reused. Then, on that SAME URL:
+```
+execute_curl  args: -s -D /tmp/rex-<id>-auth.hdr -o /tmp/rex-<id>-auth.body -w '%{http_code}' '<buster url>'
+              use_session: true
+execute_curl  args: -s -D /tmp/rex-<id>-anon.hdr -o /tmp/rex-<id>-anon.body -w '%{http_code}' '<buster url>'
+```
+One execute_code script prints both statuses, both bodies' sha256[:8], equal yes/no, and
+from the ANONYMOUS answer only the Age, X-Cache, CF-Cache-Status and Cache-Control
+headers; then removes the files. Proof: the anonymous body hash equals the logged-in one
+AND a cache hit shows (Age above 0, or X-Cache / CF-Cache-Status HIT). Your own account
+only; never send PURGE; never reuse a buster.
+
+**B4. Client-side-only gating (anonymous_access, route_class client_gated).**
+1. execute_playwright, which never carries the session: open the site root, then go to
+   the hidden page (the lead's url when it is a page, or the router page that calls the
+   lead's API), and print only the paths of the fetch/XHR requests it fires.
+2. Each API path it fires, and the lead's url when it is itself an API, gets the L2 pair.
+3. Proof: the API answers anonymously with the content it gives logged in.
+4. A hidden page whose API answers 401 anonymously is NOT a finding: client-side hiding
+   with server-side enforcement is correct. Record nothing for it; list it as rejected.
+
+**B5. Record, then verify,** under the contract below: one `vulnerability_confirmed`
+entry per proven lead with its exact id, nothing for a rejected one.
+""" + _VALUES_IN_FILES + _RECORD_CONTRACT + _SAFETY_RULES

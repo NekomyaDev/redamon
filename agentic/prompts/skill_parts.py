@@ -164,6 +164,8 @@ _SPECS = (
     ("access_control", "safe_state", "safe_handling_prompts.ACCESS_CONTROL_SAFE_STATE", PLAIN, (), _ALWAYS),
     ("access_control", "route_exposure_leads", "access_control_prompts.ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS",
      PLAIN, (), "ROUTE_EXPOSURE_ENABLED"),
+    ("access_control", "route_exposure_browser_leads",
+     "access_control_prompts.ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS", PLAIN, (), "ROUTE_EXPOSURE_ENABLED"),
 
     ("http_request_smuggling", "tools", "http_smuggling_prompts.HTTP_SMUGGLING_TOOLS", PLAIN, (), _ALWAYS),
     ("http_request_smuggling", "zero_cl_step", "http_smuggling_prompts.HTTP_SMUGGLING_ZERO_CL_STEP",

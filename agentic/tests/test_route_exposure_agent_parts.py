@@ -51,7 +51,7 @@ def test_module_off_is_byte_identical(skill):
 
 
 @pytest.mark.parametrize("skill,new", [
-    ("access_control", ["ROUTE EXPOSURE LEADS"]),
+    ("access_control", ["ROUTE EXPOSURE LEADS", "ROUTE EXPOSURE BROWSER LEADS"]),
     ("path_traversal", ["EXPOSED FILES RECON FOUND"]),
     ("rce", ["DEBUG CONSOLES AND ENDPOINTS RECON FOUND"]),
 ])
@@ -103,11 +103,13 @@ def test_rce_heapdump_gate(settings, on):
 
 
 def _new_parts():
-    from prompts import (ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS, PATH_TRAVERSAL_EXPOSED_FILES,
+    from prompts import (ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS,
+                         ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS, PATH_TRAVERSAL_EXPOSED_FILES,
                          PATH_TRAVERSAL_GIT_RECONSTRUCT, PATH_TRAVERSAL_VALIDATE_SECRETS,
                          RCE_HEAPDUMP_ANALYSIS, RCE_ROUTE_EXPOSURE_CONSOLES)
     return {
         "leads": ACCESS_CONTROL_ROUTE_EXPOSURE_LEADS,
+        "browser": ACCESS_CONTROL_ROUTE_EXPOSURE_BROWSER_LEADS,
         "exposed_files": PATH_TRAVERSAL_EXPOSED_FILES.format(git_reconstruct="DISABLED",
                                                              validate_secrets="DISABLED"),
         "git": PATH_TRAVERSAL_GIT_RECONSTRUCT,
@@ -117,7 +119,7 @@ def _new_parts():
     }
 
 
-@pytest.mark.parametrize("name", ["leads", "exposed_files", "git", "validate", "consoles", "heapdump"])
+@pytest.mark.parametrize("name", ["leads", "browser", "exposed_files", "git", "validate", "consoles", "heapdump"])
 def test_every_part_names_real_tools_only_and_no_em_dash(name):
     text = _new_parts()[name]
     assert "—" not in text
@@ -127,7 +129,7 @@ def test_every_part_names_real_tools_only_and_no_em_dash(name):
     assert "{" not in re.sub(r"\{[^{}]*\}", "", text) or "MATCH" in text
 
 
-@pytest.mark.parametrize("name", ["leads", "exposed_files", "consoles"])
+@pytest.mark.parametrize("name", ["leads", "browser", "exposed_files", "consoles"])
 def test_main_parts_carry_the_contract(name):
     text = _new_parts()[name]
     # A bounded, ordered pull of route_exposure nodes.
@@ -314,3 +316,22 @@ def test_the_console_secret_is_the_script_variable_and_never_guessed():
     assert 'the page\'s `SECRET = "..."` script variable (beside `EVALEX`, not a form field)' in flat
     assert "`frm` is `0` on the standalone console" in flat
     assert "never prints it, and sends nothing when it is missing" in flat
+
+
+def test_the_browser_part_proves_each_v2_lead_its_own_way():
+    flat = " ".join(_new_parts()["browser"].split())
+    # The pull takes the v2 kinds and the client-gated leads L1 also returns.
+    assert "v.exposure_kind IN ['cors_misconfig', 'auth_cacheable']" in flat
+    assert "v.route_class = 'client_gated'" in flat and "prove those with B4, not with L2-L3" in flat
+    # CORS: four origins, logged in, headers to a file; proof needs credentials AND a sensitive body.
+    for origin in ("https://evil.invalid", "`null`", "https://<host>.evil.invalid", "https://evil<registrable domain>"):
+        assert origin in flat
+    # Headers go to a file: `-D -` would echo the session (the shared rules forbid it).
+    assert "-D /tmp/rex-<id>-<n>.hdr" in flat
+    assert "a `*` origin without credentials" in flat and "evidence/cors-<id>.html" in flat
+    assert "never served, never opened" in flat
+    # Cache: a unique buster, logged-in then anonymous on the same URL, never PURGE.
+    assert "?rdmncb=<12 random hex>" in flat and "never send PURGE" in flat and "never reuse a buster" in flat
+    # Client-side gating: an anonymous render, then the pair; a 401 API is correct, not a finding.
+    assert "execute_playwright, which never carries the session" in flat
+    assert "client-side hiding with server-side enforcement is correct" in flat

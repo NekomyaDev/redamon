@@ -337,3 +337,25 @@ agent:
     no_edges: true
     transcript_lacks: ["route_exposure", "Route exposure", "ROUTE EXPOSURE", "recon's route-exposure"]
     hits: {only_methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]}
+  AG16-17:
+    # A2 (plan §23.13.5): AG16 (CORS + cache) and AG17 (client-side gating) in one
+    # access_control session, on the v2-A project.
+    prompt: "Check the CORS, cache and client-side gated leads recon found"
+    confirm: [/api/profile, /api/admin/stats]
+    confirm_kinds: {/api/profile: [cors_misconfig, auth_cacheable]}
+    # The hidden page itself may be confirmed with its API; its 401-backed twin must not.
+    reject: [/admin/reports, /api/admin/reports, /api/public-cors]
+    may_confirm: [/admin/dashboard, /internal/users/export, /api/v2/reports/export, /api/v1/orders/42,
+                  /api/admin/export, /api/users/me, /uploads/invoice-1001.pdf, /api/orders,
+                  /api/internal/billing/reconcile,
+                  /.env, /.git/HEAD, /.git/config, /web.config, /config.php.bak, /backup.zip,
+                  /console, /console-open, /actuator/env, /actuator/heapdump, /actuator/mappings,
+                  /_ignition/health-check, /debug/error, /phpinfo.php]
+    transcript_has: ["execute_playwright", "rdmncb="]
+    workspace_files: [evidence/cors-]
+    hits:
+      only_methods: [GET, HEAD, OPTIONS]
+      origins_min: {/api/profile: 4}
+      anonymous_paths: [/admin/dashboard]
+      count:
+        'rdmncb=': {min: 2}
