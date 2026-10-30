@@ -159,3 +159,51 @@ test('each module row and its AI in Pipeline card are one switch, and it persist
     expect(after[field], `${field} off did not persist`).toBe(false)
   }
 })
+
+test('with AI in Pipeline off both controls are disabled, and the master switch never moves them', async ({ page }) => {
+  await openSettings(page)
+  await openTab(page, 'Target & Modules')
+  for (const { field } of HOOKS) {
+    const jev = aiPanelControl(page, field).getByRole('button', { name: 'Jev' })
+    await expect(jev, 'Jev stayed disabled: no Jev token on this account?').toBeEnabled({ timeout: 15_000 })
+    await jev.click()
+    await expect(jev).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  const master = page.getByText('Enable AI in Pipeline', { exact: true }).first()
+    .locator('xpath=ancestor::div[.//*[@role="switch"]][1]').getByRole('switch').first()
+  await expect(master).toHaveAttribute('aria-checked', 'true')
+  await master.click()
+  await expect(master).toHaveAttribute('aria-checked', 'false')
+
+  // With the master off the AI in Pipeline panel hides every hook card, as for
+  // every other hook; the module card keeps its rows, disabled with the hint.
+  await expect(page.getByTestId('ai-hook-list')).toHaveCount(0)
+  const hint = 'Enable "AI in Pipeline" in the Target tab to turn this on.'
+  await openTab(page, 'Vulnerability Scanning')
+  for (const { row } of HOOKS) {
+    const jev = moduleControl(page, row).getByRole('button', { name: 'Jev' })
+    await expect(jev).toBeDisabled()
+    await expect(jev).toHaveAttribute('title', hint)
+    await expect(jev).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  const body = await save(page)
+  const after = await stored()
+  expect(body.aiInPipeline).toBe(false)
+  for (const { field } of HOOKS) {
+    expect(after[field], `the master switch reset ${field}`).toBe(true)
+  }
+
+  // Back on, the cards return holding the stored value: the master never moved it.
+  await openSettings(page)
+  await openTab(page, 'Target & Modules')
+  const masterAgain = page.getByText('Enable AI in Pipeline', { exact: true }).first()
+    .locator('xpath=ancestor::div[.//*[@role="switch"]][1]').getByRole('switch').first()
+  await masterAgain.click()
+  await expect(masterAgain).toHaveAttribute('aria-checked', 'true')
+  for (const { field } of HOOKS) {
+    await expect(aiPanelControl(page, field).getByRole('button', { name: 'Jev' }), field)
+      .toHaveAttribute('aria-pressed', 'true')
+  }
+})
