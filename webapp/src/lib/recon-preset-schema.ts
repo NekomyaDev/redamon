@@ -505,6 +505,13 @@ export const reconPresetSchema = z.object({
   routeExposureVersionVariants: bool,
   routeExposureCompareLoggedIn: bool,
   routeExposurePiiDetection: bool,
+  routeExposureSiblings: bool,
+  routeExposureFrameworkSeeds: bool,
+  routeExposureFollowCatalogs: bool,
+  routeExposureGitWalk: bool,
+  routeExposureCrossHost: bool,
+  routeExposureCorsRider: bool,
+  routeExposureCacheRider: bool,
 
   // -- CVE Lookup --
   cveLookupEnabled: bool,
@@ -1089,6 +1096,13 @@ OpenAPI source URLs and the project Authenticated Session profile are project-sp
 - routeExposureVersionVariants: boolean - Try older API versions of versioned routes (/api/v2/x -> /api/v1/x, /api/x). Default true.
 - routeExposureCompareLoggedIn: boolean - Also request each route logged in where the authentication profile covers the host. Default true.
 - routeExposurePiiDetection: boolean - Detect personal data in answers; stores types and one count, never values. Default true.
+- routeExposureSiblings: boolean - Generate sibling routes from each API route (collection, /export, /all, /list, admin/internal segments), at most 6 per route and 100 per host. Default true.
+- routeExposureFrameworkSeeds: boolean - Request framework debug/management paths from the host's detected technologies (Spring actuator incl. heapdump HEAD-only, Django/Laravel/Rails/Go/.NET/PHP/Apache), at most 30 per host. Default true.
+- routeExposureFollowCatalogs: boolean - When an open route catalog is found (actuator mappings, anonymous OpenAPI/Swagger, rails routes), parse and request its routes once, at most 500 per host. Default true.
+- routeExposureGitWalk: boolean - After an exposed .git/HEAD, fetch the ref and one commit object and inflate it bounded to prove reconstructability; stores only the proof, never the tree or blobs. Default true.
+- routeExposureCrossHost: boolean - Try a path that hit on one host against other in-scope hosts with the same technology or title, at most 50. Default false.
+- routeExposureCorsRider: boolean - On a personalised, sensitive logged-in route, resend with crafted Origin headers to detect a credentialed reflected origin; headers only, never a body. Default true.
+- routeExposureCacheRider: boolean - On a personalised, sensitive logged-in route, check whether the answer is cacheable to an anonymous visitor; never plants or fetches from cache. Default true.
 
 ## CVE Lookup
 - cveLookupEnabled: boolean

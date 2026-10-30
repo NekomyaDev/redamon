@@ -789,6 +789,14 @@ model Project {
   routeExposureVersionVariants     Boolean  @default(true) @map("route_exposure_version_variants")
   routeExposureCompareLoggedIn     Boolean  @default(true) @map("route_exposure_compare_logged_in")
   routeExposurePiiDetection        Boolean  @default(true) @map("route_exposure_pii_detection")
+  // v2 discovery multiplier and riders
+  routeExposureSiblings            Boolean  @default(true) @map("route_exposure_siblings")
+  routeExposureFrameworkSeeds      Boolean  @default(true) @map("route_exposure_framework_seeds")
+  routeExposureFollowCatalogs      Boolean  @default(true) @map("route_exposure_follow_catalogs")
+  routeExposureGitWalk             Boolean  @default(true) @map("route_exposure_git_walk")
+  routeExposureCrossHost           Boolean  @default(false) @map("route_exposure_cross_host")
+  routeExposureCorsRider           Boolean  @default(true) @map("route_exposure_cors_rider")
+  routeExposureCacheRider          Boolean  @default(true) @map("route_exposure_cache_rider")
 
   // ========== RESOURCE ENUM AI CLASSIFIER ==========
   // Cross-cutting AI classifier — runs after Katana/Hakrawler/GAU/FFuf/jsluice/

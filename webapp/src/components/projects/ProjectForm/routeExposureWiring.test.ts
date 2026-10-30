@@ -22,7 +22,7 @@ describe('RouteExposure wiring', () => {
   })
 
   test('reads BaseURL and Endpoint, writes Vulnerability and Endpoint, enriches Endpoint', () => {
-    expect(SECTION_INPUT_MAP.RouteExposure).toEqual(['BaseURL', 'Endpoint'])
+    expect(SECTION_INPUT_MAP.RouteExposure).toEqual(['BaseURL', 'Endpoint', 'Technology'])
     expect(SECTION_NODE_MAP.RouteExposure).toEqual(['Vulnerability', 'Endpoint'])
     expect(SECTION_ENRICH_MAP.RouteExposure).toEqual(['Endpoint'])
   })

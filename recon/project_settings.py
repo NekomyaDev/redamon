@@ -874,6 +874,14 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'ROUTE_EXPOSURE_VERSION_VARIANTS': True,
     'ROUTE_EXPOSURE_COMPARE_LOGGED_IN': True,
     'ROUTE_EXPOSURE_PII_DETECTION': True,
+    # v2 discovery multiplier and riders
+    'ROUTE_EXPOSURE_SIBLINGS': True,
+    'ROUTE_EXPOSURE_FRAMEWORK_SEEDS': True,
+    'ROUTE_EXPOSURE_FOLLOW_CATALOGS': True,
+    'ROUTE_EXPOSURE_GIT_WALK': True,
+    'ROUTE_EXPOSURE_CROSS_HOST': False,
+    'ROUTE_EXPOSURE_CORS_RIDER': True,
+    'ROUTE_EXPOSURE_CACHE_RIDER': True,
 }
 
 
@@ -2272,6 +2280,13 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
     settings['ROUTE_EXPOSURE_VERSION_VARIANTS'] = project.get('routeExposureVersionVariants', DEFAULT_SETTINGS['ROUTE_EXPOSURE_VERSION_VARIANTS'])
     settings['ROUTE_EXPOSURE_COMPARE_LOGGED_IN'] = project.get('routeExposureCompareLoggedIn', DEFAULT_SETTINGS['ROUTE_EXPOSURE_COMPARE_LOGGED_IN'])
     settings['ROUTE_EXPOSURE_PII_DETECTION'] = project.get('routeExposurePiiDetection', DEFAULT_SETTINGS['ROUTE_EXPOSURE_PII_DETECTION'])
+    settings['ROUTE_EXPOSURE_SIBLINGS'] = project.get('routeExposureSiblings', DEFAULT_SETTINGS['ROUTE_EXPOSURE_SIBLINGS'])
+    settings['ROUTE_EXPOSURE_FRAMEWORK_SEEDS'] = project.get('routeExposureFrameworkSeeds', DEFAULT_SETTINGS['ROUTE_EXPOSURE_FRAMEWORK_SEEDS'])
+    settings['ROUTE_EXPOSURE_FOLLOW_CATALOGS'] = project.get('routeExposureFollowCatalogs', DEFAULT_SETTINGS['ROUTE_EXPOSURE_FOLLOW_CATALOGS'])
+    settings['ROUTE_EXPOSURE_GIT_WALK'] = project.get('routeExposureGitWalk', DEFAULT_SETTINGS['ROUTE_EXPOSURE_GIT_WALK'])
+    settings['ROUTE_EXPOSURE_CROSS_HOST'] = project.get('routeExposureCrossHost', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CROSS_HOST'])
+    settings['ROUTE_EXPOSURE_CORS_RIDER'] = project.get('routeExposureCorsRider', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CORS_RIDER'])
+    settings['ROUTE_EXPOSURE_CACHE_RIDER'] = project.get('routeExposureCacheRider', DEFAULT_SETTINGS['ROUTE_EXPOSURE_CACHE_RIDER'])
 
     # RoE: cap every rate the engagement ceiling applies to.
     apply_roe_rate_cap(settings)

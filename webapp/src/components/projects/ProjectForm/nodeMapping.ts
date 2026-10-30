@@ -36,7 +36,7 @@ export const SECTION_INPUT_MAP: Record<string, string[]> = {
   SubdomainTakeover:  ['Subdomain', 'BaseURL', 'Domain'],
   VhostSni:           ['Subdomain', 'IP', 'Port', 'BaseURL', 'Certificate', 'DNSRecord', 'ExternalDomain'],
   WebCachePoison:     ['BaseURL', 'Endpoint'],
-  RouteExposure:      ['BaseURL', 'Endpoint'],
+  RouteExposure:      ['BaseURL', 'Endpoint', 'Technology'],
 }
 
 export const SECTION_NODE_MAP: Record<string, string[]> = {

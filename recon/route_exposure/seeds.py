@@ -66,6 +66,37 @@ CAP_SEED = 60
 CAP_VCS = 30
 CAP_BACKUP = 40
 CAP_VERSION_PER_ROUTE = 3
+# v2 caps.
+CAP_SIBLING_PER_ROUTE = 6
+CAP_SIBLING_PER_HOST = 100
+CAP_FRAMEWORK = 30
+CAP_CROSS_HOST = 50
+CAP_CATALOG_ROUTES = 500
+
+#: v2 sibling generators appended to a harvested API route. The collection and the
+#: list/all/export leaves are the siblings most likely to answer where one item does.
+SIBLING_LEAF_SUFFIXES = ("/export", "/all", "/list")
+#: Inserted right after the API prefix (/api/<x> -> /api/admin/<x>, /api/internal/<x>).
+SIBLING_INSERT_SEGMENTS = ("admin", "internal")
+#: Prefixed to a harvested route (/x -> /internal/x, /private/x).
+SIBLING_PREFIXES = ("/internal", "/private")
+
+#: v2 framework seeds, keyed by a lowercase technology token the host fingerprint
+#: carries. The heap dump is HEAD-only (a GET streams 50 MB); `generators` marks it.
+FRAMEWORK_SEEDS = {
+    "spring": ("/actuator", "/actuator/env", "/actuator/mappings", "/actuator/configprops",
+               "/actuator/heapdump"),
+    "django": ("/admin/",),
+    "laravel": ("/telescope", "/horizon", "/_ignition/health-check"),
+    "rails": ("/rails/info/routes",),
+    "go": ("/debug/pprof/", "/debug/vars"),
+    "asp.net": ("/elmah.axd", "/trace.axd"),
+    "dotnet": ("/elmah.axd", "/trace.axd"),
+    "php": ("/phpinfo.php", "/info.php"),
+    "apache": ("/server-status",),
+}
+#: Framework paths read with HEAD only (never a full GET): large or streaming bodies.
+FRAMEWORK_HEAD_ONLY = frozenset({"/actuator/heapdump"})
 
 #: Never requested, and never generated a backup variant for: public assets.
 STATIC_EXTENSIONS = frozenset({

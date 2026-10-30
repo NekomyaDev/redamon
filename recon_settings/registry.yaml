@@ -8032,6 +8032,110 @@ fields:
       stays capped by routeExposureMaxRps whatever this is. The memory governor
       scales it down when the host is short of RAM, so the effective value can be
       below what is written here.
+  routeExposureSiblings:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_SIBLINGS"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan generates sibling routes from each harvested
+      API route: the collection (dropping a trailing id), its /export, /all and
+      /list, an admin or internal segment inserted after the API prefix, and an
+      /internal or /private prefix. At most 6 per route and 100 per host. On by
+      default.
+  routeExposureFrameworkSeeds:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_FRAMEWORK_SEEDS"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether the route exposure scan requests framework-specific debug and
+      management paths based on the technologies recon fingerprinted on the host:
+      Spring actuator endpoints (/actuator/env, /actuator/mappings, and
+      /actuator/heapdump with HEAD only), Django /admin, Laravel /telescope,
+      /horizon and /_ignition/health-check, Rails /rails/info/routes, Go
+      /debug/pprof, .NET /elmah.axd, PHP /phpinfo.php, Apache /server-status. At
+      most 30 per host. On by default.
+  routeExposureFollowCatalogs:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_FOLLOW_CATALOGS"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether, when the scan finds an open route catalog (an /actuator/mappings
+      document, an anonymously served OpenAPI or Swagger spec, /rails/info/routes),
+      it parses the routes it lists and requests them once, in a single follow-up
+      round that never recurses. At most 500 routes per host. On by default.
+  routeExposureGitWalk:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_GIT_WALK"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether, after an exposed /.git/HEAD is confirmed, the scan fetches the ref it
+      names and one loose commit object and inflates it with a bounded decompressor,
+      to prove the repository is reconstructable. At most 4 requests, each body at
+      most 64 KiB; it stores only the proof and the commit tree's hash prefix, and
+      never downloads the tree or blobs. On by default.
+  routeExposureCrossHost:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_CROSS_HOST"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether a path that produced a candidate or finding on one in-scope host is
+      tried on the other in-scope hosts that share its technology set or page title.
+      Each target host must still pass the scope and SSRF checks. At most 50
+      requests. Off by default, because it widens the traffic across hosts.
+  routeExposureCorsRider:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_CORS_RIDER"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether, on a logged-in route whose answer is personalised and sensitive, the
+      scan resends the request with crafted Origin headers (an attacker origin,
+      null, a suffix and a prefix variant) to detect a reflected origin returned
+      with credentials. At most 4 extra requests per route; it reads only the CORS
+      response headers and never a body. On by default.
+  routeExposureCacheRider:
+    tool: route_exposure
+    runtime_key: "ROUTE_EXPOSURE_CACHE_RIDER"
+    unit: none
+    phase: vuln_scan
+    traffic: active
+    roe_capped: false
+    mcp: settable
+    group: attack
+    meaning: >-
+      Whether, on a logged-in route whose answer is personalised and sensitive, the
+      scan checks the response's cache headers and the cache oracle for a layer that
+      would let a logged-in page be served from cache to an anonymous visitor. It
+      never plants or fetches from cache; that proof is the agent's. On by default.
   scaIntelCorrelationEnabled:
     tool: supply_chain_recon
     runtime_key: "SCA_INTEL_CORRELATION_ENABLED"

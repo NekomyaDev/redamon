@@ -167,7 +167,12 @@ def settings(**overrides) -> dict:
             "ROUTE_EXPOSURE_MAX_RPS": 50, "ROUTE_EXPOSURE_WORKERS": 4, "ROUTE_EXPOSURE_TIMEOUT": 5,
             "ROUTE_EXPOSURE_SEED_PATHS": False, "ROUTE_EXPOSURE_VCS_FILES": False,
             "ROUTE_EXPOSURE_BACKUP_FILES": False, "ROUTE_EXPOSURE_VERSION_VARIANTS": False,
-            "ROUTE_EXPOSURE_COMPARE_LOGGED_IN": True, "ROUTE_EXPOSURE_PII_DETECTION": True}
+            "ROUTE_EXPOSURE_COMPARE_LOGGED_IN": True, "ROUTE_EXPOSURE_PII_DETECTION": True,
+            # v2 generators and riders off by default in tests; each v2 test opts its own in.
+            "ROUTE_EXPOSURE_SIBLINGS": False, "ROUTE_EXPOSURE_FRAMEWORK_SEEDS": False,
+            "ROUTE_EXPOSURE_FOLLOW_CATALOGS": False, "ROUTE_EXPOSURE_GIT_WALK": False,
+            "ROUTE_EXPOSURE_CROSS_HOST": False, "ROUTE_EXPOSURE_CORS_RIDER": False,
+            "ROUTE_EXPOSURE_CACHE_RIDER": False}
     base.update(overrides)
     return base
 

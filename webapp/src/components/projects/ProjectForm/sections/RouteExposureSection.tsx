@@ -165,6 +165,82 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                     aria-label="Older API versions"
                   />
                 </div>
+
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Sibling routes</div>
+                    <div className={styles.toggleDescription}>
+                      From each API route, tries its collection, /export, /all and /list, and internal or admin
+                      variants, at most 6 per route. On by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureSiblings ?? true}
+                    onChange={(c) => updateField('routeExposureSiblings', c ?? true)}
+                    aria-label="Sibling routes"
+                  />
+                </div>
+
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Framework paths</div>
+                    <div className={styles.toggleDescription}>
+                      Requests debug and management paths for the frameworks recon detected on the host (Spring
+                      actuator, Django, Laravel, Rails, Go, .NET, PHP, Apache), at most 30 per host. The Spring
+                      heap dump is checked with HEAD only. On by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureFrameworkSeeds ?? true}
+                    onChange={(c) => updateField('routeExposureFrameworkSeeds', c ?? true)}
+                    aria-label="Framework paths"
+                  />
+                </div>
+
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Follow route catalogs</div>
+                    <div className={styles.toggleDescription}>
+                      When an open list of routes is found (actuator mappings, an anonymous OpenAPI spec, Rails
+                      routes), requests the routes it names once, at most 500 per host. On by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureFollowCatalogs ?? true}
+                    onChange={(c) => updateField('routeExposureFollowCatalogs', c ?? true)}
+                    aria-label="Follow route catalogs"
+                  />
+                </div>
+
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Git walk proof</div>
+                    <div className={styles.toggleDescription}>
+                      After an exposed .git, fetches the branch ref and one commit object to prove the repository
+                      can be rebuilt. Stores only the proof, never the source. On by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureGitWalk ?? true}
+                    onChange={(c) => updateField('routeExposureGitWalk', c ?? true)}
+                    aria-label="Git walk proof"
+                  />
+                </div>
+
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Cross-host</div>
+                    <div className={styles.toggleDescription}>
+                      Tries a path that hit on one host against the other in-scope hosts with the same technology
+                      or page title, at most 50. Off by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureCrossHost ?? false}
+                    onChange={(c) => updateField('routeExposureCrossHost', c ?? false)}
+                    aria-label="Cross-host"
+                  />
+                </div>
               </div>
 
               <div className={styles.fieldGroup}>
@@ -205,6 +281,40 @@ export function RouteExposureSection({ data, updateField, onRun, onOpenAuth, onO
                     checked={data.routeExposurePiiDetection ?? true}
                     onChange={(c) => updateField('routeExposurePiiDetection', c ?? true)}
                     aria-label="Personal data detection"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>What it checks on sensitive routes</label>
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Cross-origin (CORS)</div>
+                    <div className={styles.toggleDescription}>
+                      On a personal, sensitive logged-in route, resends the request with crafted Origin headers to
+                      spot a reflected origin returned with credentials. Reads the response headers only, never a
+                      body. On by default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureCorsRider ?? true}
+                    onChange={(c) => updateField('routeExposureCorsRider', c ?? true)}
+                    aria-label="Cross-origin (CORS)"
+                  />
+                </div>
+                <div className={styles.toggleRow}>
+                  <div>
+                    <div className={styles.toggleLabel}>Cacheable logged-in content</div>
+                    <div className={styles.toggleDescription}>
+                      On a personal, sensitive logged-in route, checks whether the answer is marked cacheable, so a
+                      cache could serve it to an anonymous visitor. Never plants or fetches from cache. On by
+                      default.
+                    </div>
+                  </div>
+                  <Toggle
+                    checked={data.routeExposureCacheRider ?? true}
+                    onChange={(c) => updateField('routeExposureCacheRider', c ?? true)}
+                    aria-label="Cacheable logged-in content"
                   />
                 </div>
               </div>

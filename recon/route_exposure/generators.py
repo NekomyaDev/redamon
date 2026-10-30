@@ -19,6 +19,9 @@ except ImportError:  # pragma: no cover - spawned-container import shim
     from helpers.resource_enum.classification import classify_endpoint
 
 _VERSION_SEGMENT = re.compile(r"/v(\d{1,2})(?=/)", re.I)
+#: A trailing segment that identifies one item (numeric, UUID or long hex): dropping
+#: it gives the collection route.
+_ID_SEGMENT = re.compile(r"^(\d+|[0-9a-fA-F]{8}-[0-9a-fA-F-]{4,}|[0-9a-f]{12,})$")
 
 #: Only a server-side source or configuration file is worth a backup guess; a
 #: backup of a public page shows what the page already shows.
@@ -94,6 +97,46 @@ def version_variants(path: str) -> list:
     return out[:seeds.CAP_VERSION_PER_ROUTE]
 
 
+def _is_api_route(route: Route) -> bool:
+    segs = [s for s in route.path.split("/") if s]
+    return ("api" in segs or route.category in ("api", "endpoint", "admin", "admin_debug")
+            or bool(_VERSION_SEGMENT.search(route.path)))
+
+
+def siblings(path: str) -> list:
+    """Sibling routes of an API path (plan §5.2): the collection (a trailing id dropped),
+    its /export, /all and /list leaves, admin/internal inserted after an /api prefix, and
+    an /internal or /private prefix. The source path itself is never returned."""
+    trimmed = (path or "/").rstrip("/") or "/"
+    segs = [s for s in trimmed.split("/") if s]
+    out: list = []
+    if len(segs) >= 2 and _ID_SEGMENT.match(segs[-1]):
+        collection = "/" + "/".join(segs[:-1])
+        out.append(collection)
+        leaf_base = collection
+    else:
+        leaf_base = trimmed
+    out.extend(leaf_base.rstrip("/") + suffix for suffix in seeds.SIBLING_LEAF_SUFFIXES)
+    if segs and segs[0] == "api":
+        rest = "/".join(segs[1:])
+        out.extend(f"/api/{seg}" + (f"/{rest}" if rest else "") for seg in seeds.SIBLING_INSERT_SEGMENTS)
+    out.extend(prefix + trimmed for prefix in seeds.SIBLING_PREFIXES)
+    return [p for p in dict.fromkeys(out) if p and p != trimmed]
+
+
+def framework_paths(technologies) -> list:
+    """(path, head_only) pairs for the frameworks named in a host's technology set."""
+    toks: set = set()
+    for tech in technologies or ():
+        toks.update(seeds.tokens(tech))
+    out: list = []
+    for key, paths in seeds.FRAMEWORK_SEEDS.items():
+        parts = key.split(".")
+        if key in toks or key.replace(".", "") in toks or (len(parts) > 1 and all(p in toks for p in parts)):
+            out.extend((p, p in seeds.FRAMEWORK_HEAD_ONLY) for p in paths)
+    return list(dict.fromkeys(out))
+
+
 def generate(corpus: Corpus, cfg: dict) -> list:
     """The generated routes (v1 generators), each host capped per generator."""
     known = set(corpus.routes)
@@ -126,6 +169,25 @@ def generate(corpus: Corpus, cfg: dict) -> list:
                     continue
                 for path in version_variants(found.path):
                     add(_route(found.baseurl, path, "version", variant_of=found.path))
+    if cfg.get("siblings"):
+        for base in corpus.bases:
+            taken = 0
+            for found in [r for r in by_base.get(base, []) if r.generated_by == "found" and _is_api_route(r)]:
+                per_route = 0
+                for path in siblings(found.path):
+                    if taken >= seeds.CAP_SIBLING_PER_HOST or per_route >= seeds.CAP_SIBLING_PER_ROUTE:
+                        break
+                    if add(_route(base, path, "sibling", variant_of=found.path)):
+                        taken += 1
+                        per_route += 1
+    if cfg.get("framework_seeds"):
+        for base in corpus.bases:
+            taken = 0
+            for path, head_only in framework_paths(corpus.technologies.get(base)):
+                if taken >= seeds.CAP_FRAMEWORK:
+                    break
+                if add(_route(base, path, "framework", request="head" if head_only else "get")):
+                    taken += 1
     return made
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import zlib
 import threading
 import warnings
 from pathlib import Path
@@ -12,11 +13,16 @@ import pytest
 
 from recon.helpers import circuit_breaker as cb
 from recon.route_exposure import (
-    generators, harvest, normalizers, prober, ranking, scanner, seeds, signals, signatures, verdict,
+    catalogs, generators, gitwalk, harvest, normalizers, prober, ranking, riders, scanner,
+    seeds, signals, signatures, verdict,
 )
 from recon.route_exposure.harvest import Corpus, Route
 
 BASE = "http://10.0.0.5"
+
+
+def zlib_compress(data: bytes) -> bytes:
+    return zlib.compress(data)
 
 
 @pytest.fixture(autouse=True)
@@ -194,6 +200,52 @@ def test_version_generator_records_its_source_and_skips_known_routes():
 
 def test_generators_off_generate_nothing():
     assert generators.generate(_corpus("/api/v2/x", "/a.php"), {}) == []
+
+
+@pytest.mark.parametrize("path,present,absent", [
+    ("/api/orders/42", {"/api/orders", "/api/orders/export", "/api/admin/orders/42",
+                        "/internal/api/orders/42"}, {"/api/orders/42"}),
+    ("/api/orders", {"/api/orders/export", "/api/orders/all", "/api/orders/list",
+                     "/api/admin/orders", "/internal/api/orders"}, {"/api/orders"}),
+])
+def test_siblings(path, present, absent):
+    out = set(generators.siblings(path))
+    assert present <= out and out.isdisjoint(absent)
+
+
+def test_sibling_generator_caps_per_route_and_marks_its_source():
+    c = _corpus("/api/orders/42")
+    made = generators.generate(c, {"siblings": True})
+    assert made and all(r.generated_by == "sibling" and r.variant_of == "/api/orders/42" for r in made)
+    assert len(made) <= seeds.CAP_SIBLING_PER_ROUTE
+    assert "/api/orders" in [r.path for r in made]
+
+
+def test_siblings_skip_a_non_api_route():
+    assert generators.generate(_corpus("/blog/post/hello"), {"siblings": True}) == []
+
+
+@pytest.mark.parametrize("techs,present,head_only", [
+    (["Spring Boot"], "/actuator/env", "/actuator/heapdump"),
+    (["PHP 8.1"], "/phpinfo.php", None),
+    (["ASP.NET"], "/elmah.axd", None),
+])
+def test_framework_paths_match_technology_tokens(techs, present, head_only):
+    pairs = dict(generators.framework_paths(techs))
+    assert present in pairs
+    if head_only:
+        assert pairs[head_only] is True
+    assert generators.framework_paths(["nginx"]) == []
+
+
+def test_framework_generator_uses_host_technologies_and_head_only_heapdump():
+    c = _corpus("/")
+    c.technologies[BASE] = {"Spring Boot"}
+    made = generators.generate(c, {"framework_seeds": True})
+    by_path = {r.path: r for r in made}
+    assert "/actuator/env" in by_path and all(r.generated_by == "framework" for r in made)
+    assert by_path["/actuator/heapdump"].request == "head"
+    assert len(made) <= seeds.CAP_FRAMEWORK
 
 
 # ---------------------------------------------------------------------------
@@ -776,4 +828,108 @@ def test_config_clamps_and_respects_a_slower_ceiling():
     assert (cfg["rps"], cfg["workers"], cfg["timeout"], cfg["per_host"], cfg["total"]) == (50, 1, 10, 10, 3000)
     assert scanner.config({"ROE_ENABLED": True, "ROE_GLOBAL_MAX_RPS": 0.5})["rps"] == 0.5
     assert scanner.config({"ROE_ENABLED": False, "ROE_GLOBAL_MAX_RPS": 0.5})["rps"] == 5
-    assert all(scanner.config({})[k] for k in scanner.SWITCHES)
+    assert all(scanner.config({})[k] for k in scanner.SWITCHES if k != "cross_host")
+    assert scanner.config({})["cross_host"] is False
+
+
+# ---------------------------------------------------------------------------
+# v2: catalogs, git walk, riders
+# ---------------------------------------------------------------------------
+
+def _answer(status=200, headers=None, content=b"", method="GET", url=BASE):
+    return prober.Answer(url=url, method=method, status_code=status,
+                         headers={k.lower(): v for k, v in (headers or {}).items()}, content=content)
+
+
+class _FakeProbe:
+    """A prober stand-in: answers from a {url: Answer} map and records what was sent."""
+    def __init__(self, answers, auth=None):
+        self._answers = answers
+        self._auth = auth or {}
+        self.sent = []
+
+    def send(self, method, url, *, auth=None, headers=None, range_bytes=None, max_bytes=None):
+        self.sent.append((method, url, (headers or {}).get("Origin")))
+        return self._answers.get(url)
+
+    def auth_headers(self, url):
+        return dict(self._auth)
+
+
+def test_catalog_parses_actuator_mappings():
+    doc = {"contexts": {"app": {"mappings": {"dispatcherServlets": {"d": [
+        {"details": {"requestMappingConditions": {"patterns": ["/api/internal/billing/reconcile",
+                                                               "/api/orders/{id}"]}}}]}}}}}
+    out = catalogs.parse(json.dumps(doc).encode(), "application/json")
+    assert "/api/internal/billing/reconcile" in out and "/api/orders/{id}" not in out
+
+
+def test_catalog_parses_openapi_and_skips_templated():
+    doc = {"openapi": "3.0.0", "paths": {"/api/status": {}, "/api/v2/orders/{id}": {}}}
+    out = catalogs.parse(json.dumps(doc).encode(), "application/json")
+    assert out == ["/api/status"]
+
+
+def test_catalog_parses_rails_routes_static_head():
+    body = b"users GET /users/:id(.:format) users#show\nhealth GET /health(.:format) health#show"
+    out = catalogs.parse(body, "text/html; charset=rails")
+    assert "/users" in out and "/health" in out
+
+
+def test_catalog_junk_never_raises():
+    assert catalogs.parse(b"\xff\x00 not json", "application/json") == []
+
+
+def test_git_inflate_is_bounded():
+    bomb = zlib_compress(b"A" * (2 * 1024 * 1024))
+    assert len(gitwalk._inflate(bomb)) <= gitwalk.MAX_OBJECT_BYTES
+
+
+def test_git_walk_proves_a_commit_from_head_ref_object():
+    root = BASE + "/.git"
+    commit_hash = "a" * 40
+    tree_hash = "b" * 40
+    obj = zlib_compress(b"commit 40\x00tree " + tree_hash.encode() + b"\nauthor x\n")
+    probe = _FakeProbe({
+        root + "/refs/heads/main": _answer(content=commit_hash.encode()),
+        root + f"/objects/{commit_hash[:2]}/{commit_hash[2:]}": _answer(content=obj),
+    })
+    proof = gitwalk.walk(probe, root, b"ref: refs/heads/main\n")
+    assert proof["git_walk_proof"] == "head>ref>commit" and proof["git_tree_prefix"] == "bbbbbbbb"
+
+
+def test_git_walk_without_a_commit_object_is_no_proof():
+    root = BASE + "/.git"
+    probe = _FakeProbe({root + "/objects/" + "aa/" + "a" * 38: _answer(content=zlib_compress(b"blob 3\x00abc"))})
+    assert gitwalk.walk(probe, root, (b"a" * 40)) == {}
+
+
+def test_cors_rider_flags_a_credentialed_reflected_origin():
+    url = BASE + "/api/profile"
+    answers = {}
+    probe = _FakeProbe(answers, auth={"Authorization": "Bearer t"})
+
+    def send(method, u, *, auth=None, headers=None, range_bytes=None, max_bytes=None):
+        origin = (headers or {}).get("Origin")
+        probe.sent.append((method, u, origin))
+        return _answer(headers={"Access-Control-Allow-Origin": origin,
+                                "Access-Control-Allow-Credentials": "true"})
+    probe.send = send
+    out = riders.cors_rider(probe, Route(BASE, "/api/profile"))
+    assert "reflected" in out["cors_variants"] and "null" in out["cors_variants"]
+
+
+def test_cors_rider_ignores_wildcard_without_credentials():
+    probe = _FakeProbe({}, auth={"Authorization": "Bearer t"})
+    probe.send = lambda *a, **k: _answer(headers={"Access-Control-Allow-Origin": "*"})
+    assert riders.cors_rider(probe, Route(BASE, "/api/profile")) == {}
+
+
+def test_cache_rider_flags_a_cacheable_hit_and_skips_vary_cookie():
+    hit = _answer(headers={"Cache-Control": "public, max-age=600", "X-Cache": "HIT", "Age": "5"})
+    out = riders.cache_rider(hit)
+    assert "cache-control:public" in out["cache_signals"] and "cache:hit" in out["cache_signals"]
+    varied = _answer(headers={"Cache-Control": "public", "Vary": "Cookie", "X-Cache": "HIT"})
+    assert riders.cache_rider(varied) == {}
+    no_layer = _answer(headers={"Cache-Control": "public, max-age=600"})
+    assert riders.cache_rider(no_layer) == {}

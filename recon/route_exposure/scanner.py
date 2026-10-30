@@ -35,7 +35,7 @@ BOUNDS = {
     "ROUTE_EXPOSURE_MAX_ROUTES_PER_HOST": (10, 5000, 300),
     "ROUTE_EXPOSURE_MAX_ROUTES_TOTAL": (50, 50000, 3000),
 }
-#: Generator and analysis switches, all on by default.
+#: Generator and analysis switches. All default on except cross_host.
 SWITCHES = {
     "seed_paths": "ROUTE_EXPOSURE_SEED_PATHS",
     "vcs_files": "ROUTE_EXPOSURE_VCS_FILES",
@@ -43,7 +43,17 @@ SWITCHES = {
     "version_variants": "ROUTE_EXPOSURE_VERSION_VARIANTS",
     "compare_logged_in": "ROUTE_EXPOSURE_COMPARE_LOGGED_IN",
     "pii_detection": "ROUTE_EXPOSURE_PII_DETECTION",
+    # v2
+    "siblings": "ROUTE_EXPOSURE_SIBLINGS",
+    "framework_seeds": "ROUTE_EXPOSURE_FRAMEWORK_SEEDS",
+    "follow_catalogs": "ROUTE_EXPOSURE_FOLLOW_CATALOGS",
+    "git_walk": "ROUTE_EXPOSURE_GIT_WALK",
+    "cross_host": "ROUTE_EXPOSURE_CROSS_HOST",
+    "cors_rider": "ROUTE_EXPOSURE_CORS_RIDER",
+    "cache_rider": "ROUTE_EXPOSURE_CACHE_RIDER",
 }
+#: Defaults for the switches when a settings dict omits them (cross_host is off).
+_SWITCH_DEFAULT = {"cross_host": False}
 
 
 def _now() -> str:
@@ -62,7 +72,7 @@ def _clamp(value, low, high, default):
 
 def config(settings: dict) -> dict:
     """The run's knobs, every numeric clamped to its registry bounds."""
-    cfg = {name: bool(settings.get(key, True)) for name, key in SWITCHES.items()}
+    cfg = {name: bool(settings.get(key, _SWITCH_DEFAULT.get(name, True))) for name, key in SWITCHES.items()}
     rps = _clamp(settings.get("ROUTE_EXPOSURE_MAX_RPS"), *BOUNDS["ROUTE_EXPOSURE_MAX_RPS"])
     ceiling = settings.get("ROE_GLOBAL_MAX_RPS") if settings.get("ROE_ENABLED") else 0
     if isinstance(ceiling, (int, float)) and not isinstance(ceiling, bool) and ceiling > 0:
