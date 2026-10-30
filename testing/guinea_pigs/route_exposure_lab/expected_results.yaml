@@ -221,7 +221,10 @@ agent:
     captures: true
   AG11:
     prompt: "Render the profile page and compare its fields with the API"
-    may_confirm: [/api/users/me]
+    # The access-control leads part runs first, so the session may confirm any true
+    # lead it re-checks on the way to the render; the render + diff is the subject.
+    may_confirm: [/api/users/me, /internal/users/export, /api/v2/reports/export,
+                  /api/v1/orders/42, /api/admin/export, /uploads/invoice-1001.pdf]
     # The diff names the fields the API returns and the page never renders, as key
     # names only; the leak scan proves no value came with them.
     transcript_has: ["password_hash", "reset_token"]
