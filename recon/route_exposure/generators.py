@@ -104,9 +104,10 @@ def version_variants(path: str) -> list:
 
 
 def _is_api_route(route: Route) -> bool:
-    segs = [s for s in route.path.split("/") if s]
-    return ("api" in segs or route.category in ("api", "endpoint", "admin", "admin_debug")
-            or bool(_VERSION_SEGMENT.search(route.path)))
+    """An API route (plan §5.2: siblings come from API routes only): an /api or a
+    version segment, or classified api. A page or a JS-named path is not one."""
+    segs = [s.lower() for s in route.path.split("/") if s]
+    return "api" in segs or route.category == "api" or bool(_VERSION_SEGMENT.search(route.path))
 
 
 def siblings(path: str) -> list:

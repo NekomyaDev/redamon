@@ -94,7 +94,16 @@ def reset_hits() -> None:
 
 #: The generator each S5 toggle turns off, as a finding's generated_by names it.
 GENERATOR_TOGGLES = {"routeExposureSeedPaths": "seed", "routeExposureVcsFiles": "vcs",
-                     "routeExposureBackupFiles": "backup", "routeExposureVersionVariants": "version"}
+                     "routeExposureBackupFiles": "backup", "routeExposureVersionVariants": "version",
+                     # v2
+                     "routeExposureSiblings": "sibling", "routeExposureFrameworkSeeds": "framework",
+                     "routeExposureFollowCatalogs": "catalog", "routeExposureGitWalk": "git_walk",
+                     "routeExposureCorsRider": "cors", "routeExposureCacheRider": "cache"}
+
+
+def _gens(row: dict) -> set:
+    gen = row.get("gen")
+    return set(gen) if isinstance(gen, list) else ({gen} if gen else set())
 
 
 def scenario_settings(name: str) -> dict:
@@ -182,6 +191,9 @@ def _match(finding: dict, row: dict) -> list:
     for hint in row.get("expected_by") or []:
         if hint not in (finding.get("auth_expected_by") or []):
             problems.append(f"auth_expected_by lacks {hint}")
+    for key in row.get("fields_absent") or []:
+        if key in finding:
+            problems.append(f"{key}={finding[key]!r} must be absent")
     return problems
 
 
@@ -206,15 +218,22 @@ def verify(name: str, project_id: str) -> int:
     disabled = {k for k, v in (sc.get("settings") or {}).items() if v is False}
     auth = sc["auth"] != "none" and "routeExposureCompareLoggedIn" not in disabled
     off_gens = {GENERATOR_TOGGLES[k] for k in disabled if k in GENERATOR_TOGGLES}
+    if not (sc.get("settings") or {}).get("routeExposureCrossHost"):
+        off_gens.add("cross_host")      # off by default
+    v2 = sc.get("phase") == "v2"
     pii_off = "routeExposurePiiDetection" in disabled
     excluded_roles = {v[1:-1] for v in (sc.get("settings") or {}).get("roeExcludedHosts", [])
                       if isinstance(v, str) and v.startswith("<")}
     ran = "route_exposure" in (data.get("metadata") or {}).get("modules_executed", [])
-    expected, must_be_absent = [], []
-    for row in EXPECTED["v1_findings"]:
+    expected, must_be_absent, optional_rows = [], [], []
+    rows = EXPECTED["v1_findings"] + (EXPECTED.get("v2_findings") or [] if v2 else [])
+    for row in rows:
         if row["role"] not in sc["roles"]:
             continue
-        if row.get("gen") in off_gens or row["role"] in excluded_roles:
+        if row.get("optional"):
+            optional_rows.append(row)
+            continue
+        if _gens(row) & off_gens or row["role"] in excluded_roles:
             must_be_absent.append(row)
             continue
         if row.get("needs_auth") and not auth:
@@ -245,13 +264,25 @@ def verify(name: str, project_id: str) -> int:
             if problems:
                 failures.append(f"{key}: " + "; ".join(problems))
         expected_keys = {(r["role"], r["path"], r["kind"]) for r in expected}
-        optional = {(r["role"], r["path"], r["kind"]) for r in EXPECTED["v1_findings"]
+        optional = {(r["role"], r["path"], r["kind"]) for r in rows
                     if r.get("needs") and r["needs"] not in (sc.get("needs") or [])}
+        optional |= {(r["role"], r["path"], r["kind"]) for r in optional_rows}
         for key in sorted(set(got) - expected_keys - optional):
             failures.append(f"unexpected {key}")
-        for row in EXPECTED["v1_absent"]:
+        for row in EXPECTED["v1_absent"] + (EXPECTED.get("v2_absent") or [] if v2 else []):
             if row["role"] in sc["roles"] and any(k[0] == row["role"] and k[1] == row["path"] for k in got):
                 failures.append(f"a finding exists on {row['role']} {row['path']}")
+        for row in EXPECTED.get("v2_fields") or [] if v2 else []:
+            f = got.get((row["role"], row["path"], row["kind"]))
+            if f is None or row["role"] not in sc["roles"]:
+                continue
+            if _gens(row) & off_gens:
+                if row["field"] in f:
+                    failures.append(f"{row['path']}: {row['field']} present with {row['gen']} off")
+            elif f.get(row["field"]) != row["value"]:
+                failures.append(f"{row['path']}: {row['field']}={f.get(row['field'])!r}, expected {row['value']!r}")
+            else:
+                report.append(f"- {row['role']} {row['path']} {row['field']}={row['value']}")
     if not auth:
         if any("authed_status" in f or "bodies_match" in f for f in findings):
             failures.append("a logged-in comparison happened without a profile")
@@ -279,6 +310,13 @@ def verify(name: str, project_id: str) -> int:
             for path in rules["never_full_get"]:
                 if any(h["path"] == path and h["method"] == "GET" and not h["range"] for h in window):
                     failures.append(f"{role}: a full GET of {path}")
+            for path in rules.get("head_only") or []:
+                if any(h["path"].split("?", 1)[0] == path and h["method"] != "HEAD" for h in window):
+                    failures.append(f"{role}: {path} was read with something other than HEAD")
+            for pattern, limit in (rules.get("max_per_role") or {}).items():
+                n = sum(1 for h in window if re.search(pattern, h["path"]))
+                if n > limit:
+                    failures.append(f"{role}: {n} request(s) matching {pattern}, at most {limit}")
             if not auth and any(h["auth"] or h["api_key"] or h["cookie"] for h in window):
                 failures.append(f"{role}: a credential rode on a request with no profile")
             if any(h["cookie"] and not h["auth"] and sc["auth"] != "cookie" for h in window):

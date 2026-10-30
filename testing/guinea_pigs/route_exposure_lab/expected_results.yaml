@@ -55,6 +55,39 @@ v1_absent:
   - {role: hostile, path: /wall/admin}
   - {role: hostile, path: /redirect-internal}
 
+# v2 rows (plan §14.1/§14.3 v2, §22.7). `gen` may list several generators: the row
+# needs all of them. `cross_host` is off by default and on only when the scenario sets
+# routeExposureCrossHost. `optional` rows may appear or not (never "unexpected").
+v2_findings:
+  - {role: main, path: /actuator/mappings, kind: route_catalog, gen: framework}
+  - {role: main, path: /api/internal/billing/reconcile, kind: anonymous_access, fields: {generated_by: catalog}, gen: [framework, catalog]}
+  - {role: main, path: /actuator/heapdump, kind: debug_endpoint, fields: {severity: high}, gen: framework}
+  - {role: main, path: /_ignition/health-check, kind: debug_console, fields: {severity: high}, gen: framework}
+  - {role: main, path: /api/orders, kind: anonymous_access, fields: {generated_by: sibling}, gen: sibling}
+  - {role: main, path: /api/orders, kind: sensitive_data, fields: {generated_by: sibling}, gen: sibling}
+  - {role: main, path: /api/admin/stats, kind: anonymous_access, fields: {route_class: client_gated}, gen: found}
+  - {role: main, path: /api/profile, kind: sensitive_data, fields: {anon_status: 401, authed_status: 200}, needs_auth: true, gen: found}
+  - {role: main, path: /api/profile, kind: cors_misconfig, fields: {cors_variants: [reflected, "null", suffix, prefix]}, needs_auth: true, gen: cors}
+  - {role: main, path: /api/profile, kind: auth_cacheable, needs_auth: true, gen: cache}
+  - {role: hostile, path: /.git/HEAD, kind: vcs_exposure, fields: {severity: high}, fields_absent: [git_walk_proof], gen: vcs}
+  - {role: twin, path: /internal/users/export, kind: anonymous_access, fields: {generated_by: cross_host}, gen: cross_host}
+  - {role: twin, path: /internal/users/export, kind: sensitive_data, fields: {generated_by: cross_host}, gen: cross_host}
+  # The SPA's admin pages answer a shell; whether it survives the page checks as a
+  # client-gated lead is the agent's (A2) question, not a recon row.
+  - {role: main, path: /admin/dashboard, kind: anonymous_access, optional: true}
+  - {role: main, path: /admin/reports, kind: anonymous_access, optional: true}
+
+# A v2 field on a v1 row: present when its generator is on, absent when off.
+v2_fields:
+  - {role: main, path: /.git/HEAD, kind: vcs_exposure, field: git_walk_proof, value: head>ref>commit, gen: git_walk}
+
+v2_absent:
+  - {role: main, path: /api/internal/billing/close}
+  - {role: main, path: /api/admin/reports}
+  - {role: main, path: /api/orders/7}
+  - {role: hostile, path: /_ignition/health-check}
+  - {role: hostile, path: /api/public-cors}
+
 # Endpoint.anon_status on routes recon already had.
 v1_anon_status:
   - {role: main, path: /api/v2/orders/42, status: 401}
@@ -65,6 +98,9 @@ hit_rules:
   only_methods: [GET, HEAD]
   head_and_range_only: [/backup.zip]
   never_full_get: [/backup.zip, /backup.tar.gz]
+  # v2: the heap dump is read with HEAD only, and the git walk fetches one object per host.
+  head_only: [/actuator/heapdump]
+  max_per_role: {'^/\.git/objects/': 1}
   outsider_zero_whole_scan: true
   rate_slack: 1.10
 
@@ -89,6 +125,13 @@ scenarios:
   S8: {phase: v1, roles: [main], auth: none, settings: {roeGlobalMaxRps: 2}}
   S10: {phase: v1, roles: [main], auth: none, settings: {stealthMode: true}}
   S11: {phase: v1, roles: [main, hostile], auth: none, settings: {routeExposureMaxRoutesPerHost: 10, routeExposureMaxRoutesTotal: 50}}
+  # §22.7 reduced v2 campaign.
+  v2-A: {phase: v2, roles: [main, twin, hostile], auth: bearer, needs: [keep_docs], settings: {}}
+  v2-B: {phase: v2, roles: [main, twin, hostile], auth: bearer, needs: [keep_docs],
+         settings: {routeExposureSiblings: false, routeExposureFrameworkSeeds: false,
+                    routeExposureFollowCatalogs: false, routeExposureGitWalk: false,
+                    routeExposureCorsRider: false, routeExposureCacheRider: false,
+                    routeExposureCrossHost: true}}
 
 # Agent campaign (plan §23.13): one block per scenario. `confirm` paths need a
 # vulnerability_confirmed CONFIRMS edge at confidence >= 80 from the session;
